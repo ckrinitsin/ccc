@@ -4,6 +4,7 @@ use clap::Parser;
 use std::fs;
 use crate::lex;
 use crate::preprocess;
+use crate::parser;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -37,7 +38,7 @@ pub fn cli() -> Result<()> {
         return Ok(());
     }
 
-    // TODO: Parser
+    let ast = parser::parse_tokens(tokens)?;
 
     if args.parse {
         return Ok(());
