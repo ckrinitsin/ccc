@@ -1,5 +1,5 @@
-use regex::Regex;
 use anyhow::Result;
+use regex::Regex;
 
 fn remove_comments(content: String) -> Result<String> {
     let re = Regex::new(r"(//.*|/\*(.|\n)*\*/)")?;

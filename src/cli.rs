@@ -1,10 +1,10 @@
-use std::path::PathBuf;
+use crate::lex;
+use crate::parser;
+use crate::preprocess;
 use anyhow::Result;
 use clap::Parser;
 use std::fs;
-use crate::lex;
-use crate::preprocess;
-use crate::parser;
+use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -44,7 +44,7 @@ pub fn cli() -> Result<()> {
         return Ok(());
     }
 
-    // TODO: Codegen 
+    // TODO: Codegen
 
     if args.codegen {
         return Ok(());

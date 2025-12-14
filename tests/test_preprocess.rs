@@ -14,7 +14,8 @@ fn no_comments() {
     int main(void) {
         return 2;
     }
-    ".to_string();
+    "
+    .to_string();
     expected.retain(|c| !c.is_ascii_whitespace());
     assert_eq!(result, expected);
 }
@@ -35,7 +36,8 @@ fn remove_two_single_line_comments() {
     int main(void) {
         return 2;
     }
-    ".to_string();
+    "
+    .to_string();
     expected.retain(|c| !c.is_ascii_whitespace());
     assert_eq!(result, expected);
 }
@@ -54,7 +56,8 @@ fn remove_inline_comment() {
     int main(void) {
         return 2;
     }
-    ".to_string();
+    "
+    .to_string();
     expected.retain(|c| !c.is_ascii_whitespace());
     assert_eq!(result, expected);
 }
@@ -77,7 +80,8 @@ fn remove_multi_line_comments() {
     int main(void) {
         return 2;
     }
-    ".to_string();
+    "
+    .to_string();
     expected.retain(|c| !c.is_ascii_whitespace());
     assert_eq!(result, expected);
 }

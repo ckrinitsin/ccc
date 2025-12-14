@@ -1,7 +1,7 @@
-use anyhow::{Result, bail};
+use anyhow::{bail, Result};
 use regex::Regex;
-use std::fmt;
 use std::collections::VecDeque;
+use std::fmt;
 
 #[derive(Debug, PartialEq)]
 pub enum Token {
@@ -28,8 +28,12 @@ impl Token {
             (Regex::new(r"return\b").unwrap(), |_| Token::Return),
             (Regex::new(r"void\b").unwrap(), |_| Token::Void),
             (Regex::new(r"int\b").unwrap(), |_| Token::Int),
-            (Regex::new(r"[0-9]+\b").unwrap(), |s| Token::Constant(s.parse::<i64>().unwrap())),
-            (Regex::new(r"[a-zA-Z_]\w*\b").unwrap(), |s| Token::Identifier(s.to_string())),
+            (Regex::new(r"[0-9]+\b").unwrap(), |s| {
+                Token::Constant(s.parse::<i64>().unwrap())
+            }),
+            (Regex::new(r"[a-zA-Z_]\w*\b").unwrap(), |s| {
+                Token::Identifier(s.to_string())
+            }),
         ]
     }
 }

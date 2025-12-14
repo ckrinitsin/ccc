@@ -1,7 +1,7 @@
-use anyhow::{Result, bail};
 use crate::lex::Token;
-use std::fmt;
+use anyhow::{bail, Result};
 use std::collections::VecDeque;
+use std::fmt;
 
 #[derive(Debug, PartialEq)]
 pub enum Ast {
@@ -33,7 +33,7 @@ fn expect_token(expect: Token, actual: Option<Token>) -> Result<()> {
                 bail!("Expected {} but found {}", expect, x);
             }
             Ok(())
-        },
+        }
         None => bail!("Expected {}", expect),
     }
 }
