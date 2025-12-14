@@ -1,8 +1,6 @@
 use anyhow::Result;
 
-mod cli;
-mod lex;
-mod preprocess;
+use ccc::cli;
 
 fn main() -> Result<()> {
     cli::cli()
