@@ -11,9 +11,17 @@ struct Cli {
     /// Input c program
     file: PathBuf,
 
-    /// Run the lexer and stop afterwards
+    /// Run lexer and stop afterwards
     #[arg(short, long)]
-    lex: bool
+    lex: bool,
+
+    /// Run lexer and parser, stop afterwards
+    #[arg(short, long)]
+    parse: bool,
+
+    /// Run lexer, parser and codegen, stop afterwards
+    #[arg(short, long)]
+    codegen: bool,
 }
 
 pub fn cli() -> Result<()> {
@@ -28,6 +36,20 @@ pub fn cli() -> Result<()> {
     if args.lex {
         return Ok(());
     }
+
+    // TODO: Parser
+
+    if args.parse {
+        return Ok(());
+    }
+
+    // TODO: Codegen 
+
+    if args.codegen {
+        return Ok(());
+    }
+
+    // TODO: Code emission
 
     Ok(())
 }
