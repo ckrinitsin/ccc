@@ -1,5 +1,6 @@
 use anyhow::{Result, bail};
 use regex::Regex;
+use std::fmt;
 use std::collections::VecDeque;
 
 #[derive(Debug, PartialEq)]
@@ -33,6 +34,22 @@ impl Token {
     }
 }
 
+impl fmt::Display for Token {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Token::Identifier(x) => write!(f, "{}", x),
+            Token::Constant(x) => write!(f, "{}", x),
+            Token::Int => write!(f, "int"),
+            Token::Void => write!(f, "void"),
+            Token::Return => write!(f, "return"),
+            Token::OpenParanthesis => write!(f, "{{"),
+            Token::CloseParanthesis => write!(f, "}}"),
+            Token::OpenBrace => write!(f, "("),
+            Token::CloseBrace => write!(f, ")"),
+            Token::Semicolon => write!(f, ";"),
+        }
+    }
+}
 
 pub fn lex(content: String) -> Result<VecDeque<Token>> {
     let mut tokens: VecDeque<Token> = VecDeque::new();
