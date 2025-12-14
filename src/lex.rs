@@ -1,5 +1,6 @@
 use anyhow::{Result, bail};
 use regex::Regex;
+use std::collections::VecDeque;
 
 #[derive(Debug, PartialEq)]
 pub enum Token {
@@ -32,19 +33,16 @@ impl Token {
     }
 }
 
-pub fn lex(content: String) -> Result<Vec<Token>> {
-    println!("Reading file");
-    println!("{}", content);
 
-    println!("Start tokenizing");
-    let mut tokens: Vec<Token> = Vec::new();
+pub fn lex(content: String) -> Result<VecDeque<Token>> {
+    let mut tokens: VecDeque<Token> = VecDeque::new();
     let mut remaining = content.trim_start();
     let patterns = Token::patterns();
     'outer: while !remaining.is_empty() {
         for (re, tok) in &patterns {
             if let Some(m) = re.find(remaining) {
                 if !m.is_empty() && m.start() == 0 {
-                    tokens.push(tok(m.as_str()));
+                    tokens.push_back(tok(m.as_str()));
                     remaining = remaining[m.end()..].trim_start();
                     continue 'outer;
                 }
