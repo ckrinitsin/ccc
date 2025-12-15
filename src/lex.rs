@@ -15,12 +15,18 @@ pub enum Token {
     OpenBrace,
     CloseBrace,
     Semicolon,
+    Decrement,
+    Negation,
+    Complement,
 }
 
 impl Token {
     pub fn patterns() -> Vec<(Regex, fn(&str) -> Token)> {
         vec![
             (Regex::new(r"\;").unwrap(), |_| Token::Semicolon),
+            (Regex::new(r"\-\-").unwrap(), |_| Token::Decrement),
+            (Regex::new(r"\-").unwrap(), |_| Token::Negation),
+            (Regex::new(r"\~").unwrap(), |_| Token::Complement),
             (Regex::new(r"\(").unwrap(), |_| Token::OpenBrace),
             (Regex::new(r"\)").unwrap(), |_| Token::CloseBrace),
             (Regex::new(r"\{").unwrap(), |_| Token::OpenParanthesis),
@@ -51,6 +57,9 @@ impl fmt::Display for Token {
             Token::OpenBrace => write!(f, "("),
             Token::CloseBrace => write!(f, ")"),
             Token::Semicolon => write!(f, ";"),
+            Token::Decrement => write!(f, "--"),
+            Token::Negation => write!(f, "-"),
+            Token::Complement => write!(f, "~"),
         }
     }
 }

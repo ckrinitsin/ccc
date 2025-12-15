@@ -67,6 +67,7 @@ impl fmt::Display for Operand {
 fn parse_operand(expr: parser::Expression) -> Result<Operand> {
     match expr {
         parser::Expression::Constant(c) => Ok(Operand::Immediate(c)),
+        _ => todo!(),
     }
 }
 

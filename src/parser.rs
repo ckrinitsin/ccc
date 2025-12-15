@@ -21,6 +21,13 @@ pub enum Statement {
 #[derive(Debug, PartialEq)]
 pub enum Expression {
     Constant(i64),
+    Unary(UnaryOp, Box<Expression>),
+}
+
+#[derive(Debug, PartialEq)]
+pub enum UnaryOp {
+    Complement,
+    Negation,
 }
 
 impl fmt::Display for Ast {
@@ -50,7 +57,17 @@ impl fmt::Display for Statement {
 impl fmt::Display for Expression {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Expression::Constant(x) => write!(f, "{}", x),
+            Expression::Constant(c) => write!(f, "{}", c),
+            Expression::Unary(op, expr) => write!(f, "{}{}", op, *expr),
+        }
+    }
+}
+
+impl fmt::Display for UnaryOp {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            UnaryOp::Complement => write!(f, "~"),
+            UnaryOp::Negation => write!(f, "-"),
         }
     }
 }
@@ -83,9 +100,34 @@ fn parse_identifier(tokens: &mut VecDeque<Token>) -> Result<String> {
     }
 }
 
+fn parse_unop(tokens: &mut VecDeque<Token>) -> Result<UnaryOp> {
+    match tokens.pop_front() {
+        Some(Token::Complement) => Ok(UnaryOp::Complement),
+        Some(Token::Negation) => Ok(UnaryOp::Negation),
+        Some(x) => bail!("Expected an identifier but found {}", x),
+        None => bail!("Expected an identifier but file ended"),
+    }
+}
+
 fn parse_expression(tokens: &mut VecDeque<Token>) -> Result<Expression> {
-    let constant = parse_constant(tokens)?;
-    Ok(Expression::Constant(constant))
+    match &tokens[0] {
+        Token::Constant(_) => {
+            let constant = parse_constant(tokens)?;
+            Ok(Expression::Constant(constant))
+        }
+        Token::Complement | Token::Negation => {
+            let unop = parse_unop(tokens)?;
+            let expr = parse_expression(tokens)?;
+            Ok(Expression::Unary(unop, Box::new(expr)))
+        }
+        Token::OpenBrace => {
+            expect_token(Token::OpenBrace, tokens.pop_front())?;
+            let expr = parse_expression(tokens)?;
+            expect_token(Token::CloseBrace, tokens.pop_front())?;
+            Ok(expr)
+        }
+        x => bail!("Broken expression: got {}", x),
+    }
 }
 
 fn parse_statement(tokens: &mut VecDeque<Token>) -> Result<Statement> {
