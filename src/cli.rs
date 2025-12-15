@@ -1,4 +1,5 @@
 use crate::codegen;
+use crate::ir;
 use crate::lex;
 use crate::parser;
 use anyhow::Result;
@@ -23,7 +24,11 @@ struct Cli {
     #[arg(short, long)]
     parse: bool,
 
-    /// Run lexer, parser and codegen, stop afterwards
+    /// Run lexer, parser and ir, stop afterwards
+    #[arg(short, long)]
+    tacky: bool,
+
+    /// Run lexer, parser, ir and codegen, stop afterwards
     #[arg(short, long)]
     codegen: bool,
 }
@@ -61,14 +66,20 @@ pub fn cli() -> Result<()> {
         return Ok(());
     }
 
-    let asm = codegen::parse_ast(ast)?;
+    let ir = ir::lift_to_ir(ast)?;
+
+    if args.tacky {
+        return Ok(());
+    }
+
+    // let asm = codegen::parse_ast(ast)?;
 
     if args.codegen {
         return Ok(());
     }
 
     let mut file = File::create(&asm_file)?;
-    write!(file, "{}", asm)?;
+    // write!(file, "{}", asm)?;
 
     let _ = Command::new("gcc")
         .arg(&asm_file)

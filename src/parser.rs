@@ -1,5 +1,5 @@
 use crate::lex::Token;
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use std::collections::VecDeque;
 use std::fmt;
 
