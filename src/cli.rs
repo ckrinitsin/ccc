@@ -1,6 +1,7 @@
 use crate::lex;
 use crate::parser;
 use crate::preprocess;
+use crate::codegen;
 use anyhow::Result;
 use clap::Parser;
 use std::fs;
@@ -44,7 +45,7 @@ pub fn cli() -> Result<()> {
         return Ok(());
     }
 
-    // TODO: Codegen
+    let asm = codegen::parse_ast(ast)?;
 
     if args.codegen {
         return Ok(());
