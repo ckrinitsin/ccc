@@ -1,5 +1,5 @@
 use ccc::lex::Token;
-use ccc::parser::{parse_tokens, Ast};
+use ccc::parser::{parse_tokens, Ast, Function, Statement, Expression};
 use std::collections::VecDeque;
 
 #[test]
@@ -18,14 +18,12 @@ fn valid1() {
     ]);
 
     let result = parse_tokens(input).unwrap();
-    let expected = Ast::Program(Box::new(Ast::Function(
-        Box::new(Ast::Identifier("main".to_string())),
-        Box::new(Ast::Statement(Box::new(Ast::Expression(Box::new(
-            Ast::Constant(2),
-        ))))),
-    )));
-
-    println!("{}", result);
+    let expected = Ast::Program(Function::Function(
+        "main".to_string(),
+        Statement::Return(Expression::Constant(
+            2,
+        )))
+    );
 
     assert_eq!(result, expected);
 }
