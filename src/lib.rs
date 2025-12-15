@@ -1,5 +1,4 @@
 pub mod cli;
+pub mod codegen;
 pub mod lex;
 pub mod parser;
-pub mod preprocess;
-pub mod codegen;

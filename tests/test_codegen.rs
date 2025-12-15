@@ -5,10 +5,8 @@ use ccc::parser;
 fn valid1() {
     let input = parser::Ast::Program(parser::Function::Function(
         "main".to_string(),
-        parser::Statement::Return(parser::Expression::Constant(
-            2,
-        )))
-    );
+        parser::Statement::Return(parser::Expression::Constant(2)),
+    ));
 
     let result = parse_ast(input).unwrap();
     let expected = Asm::Program(Function::Function(

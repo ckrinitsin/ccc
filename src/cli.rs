@@ -1,11 +1,13 @@
+use crate::codegen;
 use crate::lex;
 use crate::parser;
-use crate::preprocess;
-use crate::codegen;
 use anyhow::Result;
 use clap::Parser;
 use std::fs;
+use std::fs::File;
+use std::io::Write;
 use std::path::PathBuf;
+use std::process::Command;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -29,9 +31,23 @@ struct Cli {
 pub fn cli() -> Result<()> {
     let args = Cli::parse();
 
-    let content = fs::read_to_string(args.file)?;
+    let mut asm_file = args.file.clone();
+    _ = asm_file.set_extension("S");
+    let mut preprocessed_file = args.file.clone();
+    _ = preprocessed_file.set_extension("i");
+    let mut binary_file = args.file.clone();
+    _ = binary_file.set_extension("");
 
-    let content = preprocess::preprocess(content)?;
+    let _ = Command::new("gcc")
+        .arg("-E")
+        .arg("-P")
+        .arg(args.file)
+        .arg("-o")
+        .arg(&preprocessed_file)
+        .output()?;
+
+    let content = fs::read_to_string(&preprocessed_file)?;
+    fs::remove_file(preprocessed_file)?;
 
     let tokens = lex::lex(content)?;
 
@@ -51,7 +67,16 @@ pub fn cli() -> Result<()> {
         return Ok(());
     }
 
-    // TODO: Code emission
+    let mut file = File::create(&asm_file)?;
+    write!(file, "{}", asm)?;
+
+    let _ = Command::new("gcc")
+        .arg(&asm_file)
+        .arg("-o")
+        .arg(binary_file)
+        .output()?;
+
+    fs::remove_file(asm_file)?;
 
     Ok(())
 }

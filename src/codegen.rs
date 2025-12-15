@@ -66,27 +66,29 @@ impl fmt::Display for Operand {
 
 fn parse_operand(expr: parser::Expression) -> Result<Operand> {
     match expr {
-        parser::Expression::Constant(c) => Ok(Operand::Immediate(c))
+        parser::Expression::Constant(c) => Ok(Operand::Immediate(c)),
     }
 }
 
 fn parse_instructions(statement: parser::Statement) -> Result<Vec<Instruction>> {
     match statement {
         parser::Statement::Return(expr) => Ok(vec![
-                Instruction::Mov(parse_operand(expr)?, Operand::Register),
-                Instruction::Ret,
-        ])
+            Instruction::Mov(parse_operand(expr)?, Operand::Register),
+            Instruction::Ret,
+        ]),
     }
 }
 
 fn parse_function(fun: parser::Function) -> Result<Function> {
     match fun {
-        parser::Function::Function(name, body) => Ok(Function::Function(name, parse_instructions(body)?))
+        parser::Function::Function(name, body) => {
+            Ok(Function::Function(name, parse_instructions(body)?))
+        }
     }
 }
 
 pub fn parse_ast(prog: parser::Ast) -> Result<Asm> {
     match prog {
-        parser::Ast::Program(fun) => Ok(Asm::Program(parse_function(fun)?))
+        parser::Ast::Program(fun) => Ok(Asm::Program(parse_function(fun)?)),
     }
 }
