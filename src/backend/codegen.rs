@@ -1,5 +1,5 @@
 use crate::frontend::ir;
-use anyhow::Result;
+use anyhow::{Result, bail};
 use std::collections::HashMap;
 
 #[derive(Debug, PartialEq)]
@@ -16,6 +16,9 @@ pub enum Function {
 pub enum Instruction {
     Mov(Operand, Operand),
     Unary(UnOp, Operand),
+    Binary(BinOp, Operand, Operand),
+    Idiv(Operand),
+    Cdq,
     AllocStack(i32),
     Ret,
 }
@@ -31,13 +34,22 @@ pub enum Operand {
 #[derive(Debug, PartialEq, Clone)]
 pub enum Reg {
     RAX,
+    RDX,
     R10,
+    R11,
 }
 
 #[derive(Debug, PartialEq)]
 pub enum UnOp {
     Neg,
     Not,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum BinOp {
+    Add,
+    Sub,
+    Mul,
 }
 
 fn parse_operand(expr: ir::Operand) -> Result<Operand> {
@@ -51,6 +63,15 @@ fn parse_unary(unary: ir::UnOp) -> Result<UnOp> {
     match unary {
         ir::UnOp::Complement => Ok(UnOp::Not),
         ir::UnOp::Negation => Ok(UnOp::Neg),
+    }
+}
+
+fn parse_binary(binary: ir::BinOp) -> Result<BinOp> {
+    match binary {
+        ir::BinOp::Addition => Ok(BinOp::Add),
+        ir::BinOp::Subtraction => Ok(BinOp::Sub),
+        ir::BinOp::Multiplication => Ok(BinOp::Mul),
+        x => bail!("{} should be handled seperately", x),
     }
 }
 
@@ -69,6 +90,39 @@ fn parse_instructions(instructions: Vec<ir::Instruction>) -> Result<Vec<Instruct
                     Operand::Register(Reg::RAX),
                 ));
                 result.push(Instruction::Ret);
+            }
+            ir::Instruction::Binary(ir::BinOp::Division, src1, src2, dst) => {
+                result.push(Instruction::Mov(
+                    parse_operand(src1)?,
+                    Operand::Register(Reg::RAX),
+                ));
+                result.push(Instruction::Cdq);
+                result.push(Instruction::Idiv(parse_operand(src2)?));
+                result.push(Instruction::Mov(
+                    Operand::Register(Reg::RAX),
+                    parse_operand(dst)?,
+                ));
+            }
+            ir::Instruction::Binary(ir::BinOp::Modulo, src1, src2, dst) => {
+                result.push(Instruction::Mov(
+                    parse_operand(src1)?,
+                    Operand::Register(Reg::RAX),
+                ));
+                result.push(Instruction::Cdq);
+                result.push(Instruction::Idiv(parse_operand(src2)?));
+                result.push(Instruction::Mov(
+                    Operand::Register(Reg::RDX),
+                    parse_operand(dst)?,
+                ));
+            }
+            ir::Instruction::Binary(bin_op, src1, src2, dst) => {
+                let dst = parse_operand(dst)?;
+                result.push(Instruction::Mov(parse_operand(src1)?, dst.clone()));
+                result.push(Instruction::Binary(
+                    parse_binary(bin_op)?,
+                    parse_operand(src2)?,
+                    dst,
+                ));
             }
         }
     }
@@ -122,6 +176,15 @@ fn replace_pseudo(asm: Asm) -> Result<Asm> {
                             let n_op = replace_pseudo_operand(op, &mut hash_map)?;
                             instr_pseudoless.push(Instruction::Unary(un_op, n_op));
                         }
+                        Instruction::Binary(bin_op, op1, op2) => {
+                            let n_op1 = replace_pseudo_operand(op1, &mut hash_map)?;
+                            let n_op2 = replace_pseudo_operand(op2, &mut hash_map)?;
+                            instr_pseudoless.push(Instruction::Binary(bin_op, n_op1, n_op2));
+                        }
+                        Instruction::Idiv(op) => {
+                            let n_op = replace_pseudo_operand(op, &mut hash_map)?;
+                            instr_pseudoless.push(Instruction::Idiv(n_op));
+                        }
                         x => instr_pseudoless.push(x),
                     }
                 }
@@ -146,7 +209,7 @@ fn is_mem_access(op: &Operand) -> bool {
 }
 
 fn fix_mem_accesses(asm: Asm) -> Result<Asm> {
-    let mut instr_pseudoless: Vec<Instruction> = Vec::new();
+    let mut new_instr: Vec<Instruction> = Vec::new();
     let function_name;
     match asm {
         Asm::Program(function) => match function {
@@ -156,24 +219,52 @@ fn fix_mem_accesses(asm: Asm) -> Result<Asm> {
                     match instr {
                         Instruction::Mov(op1, op2) => {
                             if is_mem_access(&op1) && is_mem_access(&op2) {
-                                instr_pseudoless
-                                    .push(Instruction::Mov(op1, Operand::Register(Reg::R10)));
-                                instr_pseudoless
-                                    .push(Instruction::Mov(Operand::Register(Reg::R10), op2));
+                                new_instr.push(Instruction::Mov(op1, Operand::Register(Reg::R10)));
+                                new_instr.push(Instruction::Mov(Operand::Register(Reg::R10), op2));
                             } else {
-                                instr_pseudoless.push(Instruction::Mov(op1, op2));
+                                new_instr.push(Instruction::Mov(op1, op2));
                             }
                         }
-                        x => instr_pseudoless.push(x),
+                        Instruction::Idiv(Operand::Immediate(c)) => {
+                            new_instr.push(Instruction::Mov(
+                                Operand::Immediate(c),
+                                Operand::Register(Reg::R10),
+                            ));
+                            new_instr.push(Instruction::Idiv(Operand::Register(Reg::R10)));
+                        }
+                        Instruction::Binary(BinOp::Mul, op1, op2) => {
+                            if is_mem_access(&op2) {
+                                new_instr.push(Instruction::Mov(
+                                    op2.clone(),
+                                    Operand::Register(Reg::R11),
+                                ));
+                                new_instr.push(Instruction::Binary(
+                                    BinOp::Mul,
+                                    op1,
+                                    Operand::Register(Reg::R11),
+                                ));
+                                new_instr.push(Instruction::Mov(Operand::Register(Reg::R11), op2));
+                            }
+                        }
+                        Instruction::Binary(bin_op, op1, op2) => {
+                            if is_mem_access(&op1) && is_mem_access(&op2) {
+                                new_instr.push(Instruction::Mov(op1, Operand::Register(Reg::R10)));
+                                new_instr.push(Instruction::Binary(
+                                    bin_op,
+                                    Operand::Register(Reg::R10),
+                                    op2,
+                                ));
+                            } else {
+                                new_instr.push(Instruction::Binary(bin_op, op1, op2));
+                            }
+                        }
+                        x => new_instr.push(x),
                     }
                 }
             }
         },
     }
-    Ok(Asm::Program(Function::Function(
-        function_name,
-        instr_pseudoless,
-    )))
+    Ok(Asm::Program(Function::Function(function_name, new_instr)))
 }
 
 pub fn gen_asm(prog: ir::TAC) -> Result<Asm> {

@@ -19,6 +19,7 @@ pub enum Function {
 #[derive(Debug, PartialEq)]
 pub enum Instruction {
     Unary(UnOp, Operand, Operand),
+    Binary(BinOp, Operand, Operand, Operand),
     Ret(Operand),
 }
 
@@ -32,6 +33,15 @@ pub enum Operand {
 pub enum UnOp {
     Complement,
     Negation,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum BinOp {
+    Addition,
+    Subtraction,
+    Multiplication,
+    Division,
+    Modulo,
 }
 
 impl fmt::Display for TAC {
@@ -60,6 +70,9 @@ impl fmt::Display for Instruction {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Instruction::Unary(op, src, dst) => write!(f, "{} = {}{}", dst, op, src),
+            Instruction::Binary(op, src1, src2, dst) => {
+                write!(f, "{} = {}{}{}", dst, src1, op, src2)
+            }
             Instruction::Ret(val) => write!(f, "return {}", val),
         }
     }
@@ -83,6 +96,18 @@ impl fmt::Display for UnOp {
     }
 }
 
+impl fmt::Display for BinOp {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            BinOp::Addition => write!(f, "+"),
+            BinOp::Subtraction => write!(f, "-"),
+            BinOp::Multiplication => write!(f, "*"),
+            BinOp::Division => write!(f, "/"),
+            BinOp::Modulo => write!(f, "%"),
+        }
+    }
+}
+
 static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 fn gen_temp() -> Operand {
@@ -94,6 +119,16 @@ fn parse_unary_op(expr: parser::UnaryOp) -> Result<UnOp> {
     match expr {
         parser::UnaryOp::Complement => Ok(UnOp::Complement),
         parser::UnaryOp::Negation => Ok(UnOp::Negation),
+    }
+}
+
+fn parse_binary_op(expr: parser::BinaryOp) -> Result<BinOp> {
+    match expr {
+        parser::BinaryOp::Addition => Ok(BinOp::Addition),
+        parser::BinaryOp::Subtraction => Ok(BinOp::Subtraction),
+        parser::BinaryOp::Multiplication => Ok(BinOp::Multiplication),
+        parser::BinaryOp::Division => Ok(BinOp::Division),
+        parser::BinaryOp::Modulo => Ok(BinOp::Modulo),
     }
 }
 
@@ -109,6 +144,16 @@ fn parse_expression(
             let op = parse_unary_op(unary_op)?;
 
             instructions.push(Instruction::Unary(op, src, dst.clone()));
+
+            Ok(dst)
+        }
+        parser::Expression::Binary(binary_op, expression1, expression2) => {
+            let src1 = parse_expression(*expression1, instructions)?;
+            let src2 = parse_expression(*expression2, instructions)?;
+            let dst = gen_temp();
+            let op = parse_binary_op(binary_op)?;
+
+            instructions.push(Instruction::Binary(op, src1, src2, dst.clone()));
 
             Ok(dst)
         }

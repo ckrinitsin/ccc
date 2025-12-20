@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use regex::Regex;
 use std::collections::VecDeque;
 use std::fmt;
@@ -18,6 +18,10 @@ pub enum Token {
     Decrement,
     Negation,
     Complement,
+    Addition,
+    Multiplication,
+    Division,
+    Modulo,
 }
 
 impl Token {
@@ -26,6 +30,10 @@ impl Token {
             (Regex::new(r"\;").unwrap(), |_| Token::Semicolon),
             (Regex::new(r"\-\-").unwrap(), |_| Token::Decrement),
             (Regex::new(r"\-").unwrap(), |_| Token::Negation),
+            (Regex::new(r"\+").unwrap(), |_| Token::Addition),
+            (Regex::new(r"\*").unwrap(), |_| Token::Multiplication),
+            (Regex::new(r"\/").unwrap(), |_| Token::Division),
+            (Regex::new(r"\%").unwrap(), |_| Token::Modulo),
             (Regex::new(r"\~").unwrap(), |_| Token::Complement),
             (Regex::new(r"\(").unwrap(), |_| Token::OpenBrace),
             (Regex::new(r"\)").unwrap(), |_| Token::CloseBrace),
@@ -60,7 +68,30 @@ impl fmt::Display for Token {
             Token::Decrement => write!(f, "--"),
             Token::Negation => write!(f, "-"),
             Token::Complement => write!(f, "~"),
+            Token::Addition => write!(f, "+"),
+            Token::Multiplication => write!(f, "*"),
+            Token::Division => write!(f, "/"),
+            Token::Modulo => write!(f, "%"),
         }
+    }
+}
+
+pub fn is_binary(token: &Token) -> bool {
+    match token {
+        Token::Negation
+        | Token::Addition
+        | Token::Multiplication
+        | Token::Division
+        | Token::Modulo => true,
+        _ => false,
+    }
+}
+
+pub fn precedence(token: &Token) -> usize {
+    match token {
+        Token::Negation | Token::Addition => 3,
+        Token::Multiplication | Token::Division | Token::Modulo => 5,
+        _ => 0,
     }
 }
 

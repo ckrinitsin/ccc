@@ -46,6 +46,178 @@ fn invalid1() {
 }
 
 #[test]
+fn binary_simple() {
+    let input = VecDeque::from([
+        Token::Int,
+        Token::Identifier("main".to_string()),
+        Token::OpenBrace,
+        Token::Void,
+        Token::CloseBrace,
+        Token::OpenParanthesis,
+        Token::Return,
+        Token::Constant(2),
+        Token::Addition,
+        Token::Constant(3),
+        Token::Negation,
+        Token::Constant(4),
+        Token::Semicolon,
+        Token::CloseParanthesis,
+    ]);
+
+    let result = parse_tokens(input).unwrap();
+    let expected = Ast::Program(Function::Function(
+        "main".to_string(),
+        Statement::Return(Expression::Binary(
+            BinaryOp::Subtraction,
+            Box::new(Expression::Binary(
+                BinaryOp::Addition,
+                Box::new(Expression::Constant(2)),
+                Box::new(Expression::Constant(3)),
+            )),
+            Box::new(Expression::Constant(4)),
+        )),
+    ));
+
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn binary_precedence() {
+    let input = VecDeque::from([
+        Token::Int,
+        Token::Identifier("main".to_string()),
+        Token::OpenBrace,
+        Token::Void,
+        Token::CloseBrace,
+        Token::OpenParanthesis,
+        Token::Return,
+        Token::Constant(2),
+        Token::Multiplication,
+        Token::Constant(3),
+        Token::Negation,
+        Token::Constant(4),
+        Token::Semicolon,
+        Token::CloseParanthesis,
+    ]);
+
+    let result = parse_tokens(input).unwrap();
+    let expected = Ast::Program(Function::Function(
+        "main".to_string(),
+        Statement::Return(Expression::Binary(
+            BinaryOp::Subtraction,
+            Box::new(Expression::Binary(
+                BinaryOp::Multiplication,
+                Box::new(Expression::Constant(2)),
+                Box::new(Expression::Constant(3)),
+            )),
+            Box::new(Expression::Constant(4)),
+        )),
+    ));
+
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn binary_precedence_switch() {
+    let input = VecDeque::from([
+        Token::Int,
+        Token::Identifier("main".to_string()),
+        Token::OpenBrace,
+        Token::Void,
+        Token::CloseBrace,
+        Token::OpenParanthesis,
+        Token::Return,
+        Token::Constant(3),
+        Token::Addition,
+        Token::Constant(4),
+        Token::Multiplication,
+        Token::Constant(8),
+        Token::Semicolon,
+        Token::CloseParanthesis,
+    ]);
+
+    let result = parse_tokens(input).unwrap();
+    let expected = Ast::Program(Function::Function(
+        "main".to_string(),
+        Statement::Return(Expression::Binary(
+            BinaryOp::Addition,
+            Box::new(Expression::Constant(3)),
+            Box::new(Expression::Binary(
+                BinaryOp::Multiplication,
+                Box::new(Expression::Constant(4)),
+                Box::new(Expression::Constant(8)),
+            )),
+        )),
+    ));
+
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn braces_over_precedence() {
+    let input = VecDeque::from([
+        Token::Int,
+        Token::Identifier("main".to_string()),
+        Token::OpenBrace,
+        Token::Void,
+        Token::CloseBrace,
+        Token::OpenParanthesis,
+        Token::Return,
+        Token::OpenBrace,
+        Token::Constant(3),
+        Token::Addition,
+        Token::Constant(4),
+        Token::CloseBrace,
+        Token::Multiplication,
+        Token::Constant(8),
+        Token::Semicolon,
+        Token::CloseParanthesis,
+    ]);
+
+    let result = parse_tokens(input).unwrap();
+    let expected = Ast::Program(Function::Function(
+        "main".to_string(),
+        Statement::Return(Expression::Binary(
+            BinaryOp::Multiplication,
+            Box::new(Expression::Binary(
+                BinaryOp::Addition,
+                Box::new(Expression::Constant(3)),
+                Box::new(Expression::Constant(4)),
+            )),
+            Box::new(Expression::Constant(8)),
+        )),
+    ));
+
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn invalid_braces() {
+    let input = VecDeque::from([
+        Token::Int,
+        Token::Identifier("main".to_string()),
+        Token::OpenBrace,
+        Token::Void,
+        Token::CloseBrace,
+        Token::OpenParanthesis,
+        Token::Return,
+        Token::OpenBrace,
+        Token::Constant(3),
+        Token::Addition,
+        Token::CloseBrace,
+        Token::Constant(4),
+        Token::Multiplication,
+        Token::Constant(8),
+        Token::Semicolon,
+        Token::CloseParanthesis,
+    ]);
+
+    let result = parse_tokens(input);
+
+    assert!(result.is_err());
+}
+
+#[test]
 fn invalid2() {
     let input = VecDeque::from([
         Token::Int,

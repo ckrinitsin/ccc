@@ -34,6 +34,11 @@ impl fmt::Display for Instruction {
             Instruction::Ret => write!(f, "movq %rbp, %rsp\n  popq %rbp\n  ret"),
             Instruction::Unary(un_op, operand) => write!(f, "{} {}", un_op, operand),
             Instruction::AllocStack(x) => write!(f, "subq ${}, %rsp", x),
+            Instruction::Binary(bin_op, operand1, operand2) => {
+                write!(f, "{} {}, {}", bin_op, operand1, operand2)
+            }
+            Instruction::Idiv(operand) => write!(f, "idivl {}", operand),
+            Instruction::Cdq => write!(f, "cdq"),
         }
     }
 }
@@ -54,6 +59,8 @@ impl fmt::Display for Reg {
         match self {
             Reg::RAX => write!(f, "eax"),
             Reg::R10 => write!(f, "r10d"),
+            Reg::RDX => write!(f, "edx"),
+            Reg::R11 => write!(f, "r11d"),
         }
     }
 }
@@ -63,6 +70,16 @@ impl fmt::Display for UnOp {
         match self {
             UnOp::Neg => write!(f, "negl"),
             UnOp::Not => write!(f, "notl"),
+        }
+    }
+}
+
+impl fmt::Display for BinOp {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            BinOp::Add => write!(f, "addl"),
+            BinOp::Sub => write!(f, "subl"),
+            BinOp::Mul => write!(f, "imull"),
         }
     }
 }
