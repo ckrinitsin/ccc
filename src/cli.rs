@@ -57,29 +57,33 @@ pub fn cli() -> Result<()> {
     let tokens = lex::lex(content)?;
 
     if args.lex {
+        println!("{:?}", tokens);
         return Ok(());
     }
 
     let ast = parser::parse_tokens(tokens)?;
 
     if args.parse {
+        println!("{}", ast);
         return Ok(());
     }
 
     let ir = ir::lift_to_ir(ast)?;
 
     if args.tacky {
+        println!("{}", ir);
         return Ok(());
     }
 
-    // let asm = codegen::parse_ast(ast)?;
+    let asm = codegen::gen_asm(ir)?;
 
     if args.codegen {
+        println!("{}", asm);
         return Ok(());
     }
 
     let mut file = File::create(&asm_file)?;
-    // write!(file, "{}", asm)?;
+    write!(file, "{}", asm)?;
 
     let _ = Command::new("gcc")
         .arg(&asm_file)

@@ -1,4 +1,4 @@
-use ccc::ir::{Function, Instruction, TAC, UnOp, Value, lift_to_ir};
+use ccc::ir::{Function, Instruction, Operand, TAC, UnOp, lift_to_ir};
 use ccc::parser;
 
 #[test]
@@ -11,7 +11,7 @@ fn simple_ast_to_ir() {
     let result = lift_to_ir(input).unwrap();
     let expected = TAC::Program(Function::Function(
         "main".to_string(),
-        vec![Instruction::Ret(Value::Constant(2))],
+        vec![Instruction::Ret(Operand::Constant(2))],
     ));
 
     assert_eq!(result, expected);
@@ -33,10 +33,10 @@ fn unop_to_ir() {
         vec![
             Instruction::Unary(
                 UnOp::Complement,
-                Value::Constant(2),
-                Value::Variable("tmp.0".to_string()),
+                Operand::Constant(2),
+                Operand::Variable("tmp.0".to_string()),
             ),
-            Instruction::Ret(Value::Variable("tmp.0".to_string())),
+            Instruction::Ret(Operand::Variable("tmp.0".to_string())),
         ],
     ));
 
@@ -65,20 +65,20 @@ fn recursive_unop_to_ir() {
         vec![
             Instruction::Unary(
                 UnOp::Negation,
-                Value::Constant(2),
-                Value::Variable("tmp.0".to_string()),
+                Operand::Constant(2),
+                Operand::Variable("tmp.0".to_string()),
             ),
             Instruction::Unary(
                 UnOp::Complement,
-                Value::Variable("tmp.0".to_string()),
-                Value::Variable("tmp.1".to_string()),
+                Operand::Variable("tmp.0".to_string()),
+                Operand::Variable("tmp.1".to_string()),
             ),
             Instruction::Unary(
                 UnOp::Negation,
-                Value::Variable("tmp.1".to_string()),
-                Value::Variable("tmp.2".to_string()),
+                Operand::Variable("tmp.1".to_string()),
+                Operand::Variable("tmp.2".to_string()),
             ),
-            Instruction::Ret(Value::Variable("tmp.2".to_string())),
+            Instruction::Ret(Operand::Variable("tmp.2".to_string())),
         ],
     ));
 

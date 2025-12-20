@@ -1,5 +1,8 @@
 use anyhow::Result;
-use std::fmt;
+use std::{
+    fmt,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 use crate::parser;
 
@@ -15,12 +18,12 @@ pub enum Function {
 
 #[derive(Debug, PartialEq)]
 pub enum Instruction {
-    Unary(UnOp, Value, Value),
-    Ret(Value),
+    Unary(UnOp, Operand, Operand),
+    Ret(Operand),
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Value {
+pub enum Operand {
     Constant(i64),
     Variable(String),
 }
@@ -62,11 +65,11 @@ impl fmt::Display for Instruction {
     }
 }
 
-impl fmt::Display for Value {
+impl fmt::Display for Operand {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Value::Constant(x) => write!(f, "{}", x),
-            Value::Variable(id) => write!(f, "{}", id),
+            Operand::Constant(x) => write!(f, "{}", x),
+            Operand::Variable(id) => write!(f, "{}", id),
         }
     }
 }
@@ -80,14 +83,11 @@ impl fmt::Display for UnOp {
     }
 }
 
-static mut COUNTER: i32 = 0;
+static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
-fn gen_temp() -> Value {
-    unsafe {
-        let counter = COUNTER;
-        COUNTER += 1;
-        Value::Variable("tmp.".to_owned() + &counter.to_string())
-    }
+fn gen_temp() -> Operand {
+    let counter = COUNTER.fetch_add(1, Ordering::SeqCst);
+    Operand::Variable("tmp.".to_owned() + &counter.to_string())
 }
 
 fn parse_unary_op(expr: parser::UnaryOp) -> Result<UnOp> {
@@ -100,9 +100,9 @@ fn parse_unary_op(expr: parser::UnaryOp) -> Result<UnOp> {
 fn parse_expression(
     expr: parser::Expression,
     instructions: &mut Vec<Instruction>,
-) -> Result<Value> {
+) -> Result<Operand> {
     match expr {
-        parser::Expression::Constant(c) => Ok(Value::Constant(c)),
+        parser::Expression::Constant(c) => Ok(Operand::Constant(c)),
         parser::Expression::Unary(unary_op, expression) => {
             let src = parse_expression(*expression, instructions)?;
             let dst = gen_temp();
@@ -135,7 +135,7 @@ fn parse_function(fun: parser::Function) -> Result<Function> {
 }
 
 pub fn lift_to_ir(prog: parser::Ast) -> Result<TAC> {
-    unsafe { COUNTER = 0 };
+    COUNTER.store(0, Ordering::SeqCst);
     match prog {
         parser::Ast::Program(fun) => Ok(TAC::Program(parse_function(fun)?)),
     }
