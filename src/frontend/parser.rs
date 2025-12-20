@@ -1,4 +1,4 @@
-use crate::lex::Token;
+use crate::frontend::lex::Token;
 use anyhow::{Result, bail};
 use std::collections::VecDeque;
 use std::fmt;

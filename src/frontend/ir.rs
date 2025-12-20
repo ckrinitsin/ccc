@@ -4,7 +4,7 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use crate::parser;
+use crate::frontend::parser;
 
 #[derive(Debug, PartialEq)]
 pub enum TAC {

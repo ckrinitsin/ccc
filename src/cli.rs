@@ -1,7 +1,7 @@
-use crate::codegen;
-use crate::ir;
-use crate::lex;
-use crate::parser;
+use crate::backend::codegen;
+use crate::frontend::ir;
+use crate::frontend::lex;
+use crate::frontend::parser;
 use anyhow::Result;
 use clap::Parser;
 use std::fs;

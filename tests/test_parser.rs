@@ -1,5 +1,5 @@
-use ccc::lex::Token;
-use ccc::parser::{parse_tokens, Ast, Expression, Function, Statement};
+use ccc::frontend::lex::Token;
+use ccc::frontend::parser::*;
 use std::collections::VecDeque;
 
 #[test]

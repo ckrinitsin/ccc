@@ -1,5 +1,5 @@
-use ccc::ir::{Function, Instruction, Operand, TAC, UnOp, lift_to_ir};
-use ccc::parser;
+use ccc::frontend::ir::*;
+use ccc::frontend::parser;
 
 #[test]
 fn simple_ast_to_ir() {

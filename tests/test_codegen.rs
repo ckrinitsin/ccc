@@ -1,5 +1,5 @@
-use ccc::codegen::{Asm, Function, Instruction, Operand, Reg, UnOp, gen_asm};
-use ccc::ir;
+use ccc::backend::codegen::*;
+use ccc::frontend::ir;
 
 #[test]
 fn simple_ir_to_asm() {

@@ -1,4 +1,4 @@
-use ccc::lex::{lex, Token};
+use ccc::frontend::lex::{Token, lex};
 
 #[test]
 fn valid1() {
