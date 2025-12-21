@@ -1,9 +1,13 @@
 # Chris' C Compiler
 
-Here you find a compiler and compiler driver that accomplish three stages:
+An attempt to write an (educational) C compiler. Provides a Lexer, Parser and a Code Generator (x86\_64).
 
-- A lexer (source code -> tokens)
-- A parser (tokens -> AST)
-- An assembly generator (AST -> asm)
+The compiler driver uses GCC's preprocessor and assembler/linker, to help turning the code into an executable.
 
-Using an assembler and a linker, you can then turn the code into an executable.
+Supports:
+- Return
+- Unary operators (!, ~, -)
+- Binary arithmetic and logical operators (+, -, \*, /, %, <<, >>, &, |)
+- Logical and relational operators (&&, ||, <, >, <=, >=, !=, ==)
+- ~~Local variables~~
+- ~~Conditions~~
