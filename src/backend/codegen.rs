@@ -34,6 +34,8 @@ pub enum Operand {
 #[derive(Debug, PartialEq, Clone)]
 pub enum Reg {
     RAX,
+    RCX,
+    CL,
     RDX,
     R10,
     R11,
@@ -50,6 +52,11 @@ pub enum BinOp {
     Add,
     Sub,
     Mul,
+    And,
+    Or,
+    Xor,
+    LShift,
+    RShift,
 }
 
 fn parse_operand(expr: ir::Operand) -> Result<Operand> {
@@ -71,6 +78,11 @@ fn parse_binary(binary: ir::BinOp) -> Result<BinOp> {
         ir::BinOp::Addition => Ok(BinOp::Add),
         ir::BinOp::Subtraction => Ok(BinOp::Sub),
         ir::BinOp::Multiplication => Ok(BinOp::Mul),
+        ir::BinOp::And => Ok(BinOp::And),
+        ir::BinOp::Or => Ok(BinOp::Or),
+        ir::BinOp::Xor => Ok(BinOp::Xor),
+        ir::BinOp::LShift => Ok(BinOp::LShift),
+        ir::BinOp::RShift => Ok(BinOp::RShift),
         x => bail!("{} should be handled seperately", x),
     }
 }
@@ -113,6 +125,24 @@ fn parse_instructions(instructions: Vec<ir::Instruction>) -> Result<Vec<Instruct
                 result.push(Instruction::Mov(
                     Operand::Register(Reg::RDX),
                     parse_operand(dst)?,
+                ));
+            }
+            ir::Instruction::Binary(
+                bin_op @ (ir::BinOp::LShift | ir::BinOp::RShift),
+                src1,
+                src2,
+                dst,
+            ) => {
+                let dst = parse_operand(dst)?;
+                result.push(Instruction::Mov(parse_operand(src1)?, dst.clone()));
+                result.push(Instruction::Mov(
+                    parse_operand(src2)?,
+                    Operand::Register(Reg::RCX),
+                ));
+                result.push(Instruction::Binary(
+                    parse_binary(bin_op)?,
+                    Operand::Register(Reg::CL),
+                    dst,
                 ));
             }
             ir::Instruction::Binary(bin_op, src1, src2, dst) => {

@@ -22,6 +22,11 @@ pub enum Token {
     Multiplication,
     Division,
     Modulo,
+    And,
+    Or,
+    Xor,
+    LShift,
+    RShift,
 }
 
 impl Token {
@@ -31,6 +36,11 @@ impl Token {
             (Regex::new(r"\-\-").unwrap(), |_| Token::Decrement),
             (Regex::new(r"\-").unwrap(), |_| Token::Negation),
             (Regex::new(r"\+").unwrap(), |_| Token::Addition),
+            (Regex::new(r"<<").unwrap(), |_| Token::LShift),
+            (Regex::new(r">>").unwrap(), |_| Token::RShift),
+            (Regex::new(r"\^").unwrap(), |_| Token::Xor),
+            (Regex::new(r"\|").unwrap(), |_| Token::Or),
+            (Regex::new(r"\&").unwrap(), |_| Token::And),
             (Regex::new(r"\*").unwrap(), |_| Token::Multiplication),
             (Regex::new(r"\/").unwrap(), |_| Token::Division),
             (Regex::new(r"\%").unwrap(), |_| Token::Modulo),
@@ -72,6 +82,11 @@ impl fmt::Display for Token {
             Token::Multiplication => write!(f, "*"),
             Token::Division => write!(f, "/"),
             Token::Modulo => write!(f, "%"),
+            Token::And => write!(f, "&"),
+            Token::Or => write!(f, "|"),
+            Token::Xor => write!(f, "^"),
+            Token::LShift => write!(f, "<<"),
+            Token::RShift => write!(f, ">>"),
         }
     }
 }
@@ -82,15 +97,24 @@ pub fn is_binary(token: &Token) -> bool {
         | Token::Addition
         | Token::Multiplication
         | Token::Division
-        | Token::Modulo => true,
+        | Token::Modulo
+        | Token::And
+        | Token::Or
+        | Token::Xor
+        | Token::LShift
+        | Token::RShift => true,
         _ => false,
     }
 }
 
 pub fn precedence(token: &Token) -> usize {
     match token {
-        Token::Negation | Token::Addition => 3,
-        Token::Multiplication | Token::Division | Token::Modulo => 5,
+        Token::Multiplication | Token::Division | Token::Modulo => 50,
+        Token::Negation | Token::Addition => 40,
+        Token::LShift | Token::RShift => 30,
+        Token::And => 25,
+        Token::Xor => 20,
+        Token::Or => 15,
         _ => 0,
     }
 }

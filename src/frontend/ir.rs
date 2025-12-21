@@ -42,6 +42,11 @@ pub enum BinOp {
     Multiplication,
     Division,
     Modulo,
+    And,
+    Or,
+    Xor,
+    LShift,
+    RShift,
 }
 
 impl fmt::Display for TAC {
@@ -104,6 +109,11 @@ impl fmt::Display for BinOp {
             BinOp::Multiplication => write!(f, "*"),
             BinOp::Division => write!(f, "/"),
             BinOp::Modulo => write!(f, "%"),
+            BinOp::And => write!(f, "&"),
+            BinOp::Or => write!(f, "|"),
+            BinOp::Xor => write!(f, "^"),
+            BinOp::LShift => write!(f, "<<"),
+            BinOp::RShift => write!(f, ">>"),
         }
     }
 }
@@ -129,6 +139,11 @@ fn parse_binary_op(expr: parser::BinaryOp) -> Result<BinOp> {
         parser::BinaryOp::Multiplication => Ok(BinOp::Multiplication),
         parser::BinaryOp::Division => Ok(BinOp::Division),
         parser::BinaryOp::Modulo => Ok(BinOp::Modulo),
+        parser::BinaryOp::And => Ok(BinOp::And),
+        parser::BinaryOp::Or => Ok(BinOp::Or),
+        parser::BinaryOp::Xor => Ok(BinOp::Xor),
+        parser::BinaryOp::LShift => Ok(BinOp::LShift),
+        parser::BinaryOp::RShift => Ok(BinOp::RShift),
     }
 }
 

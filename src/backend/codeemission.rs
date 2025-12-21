@@ -61,6 +61,8 @@ impl fmt::Display for Reg {
             Reg::R10 => write!(f, "r10d"),
             Reg::RDX => write!(f, "edx"),
             Reg::R11 => write!(f, "r11d"),
+            Reg::RCX => write!(f, "ecx"),
+            Reg::CL => write!(f, "cl"),
         }
     }
 }
@@ -80,6 +82,11 @@ impl fmt::Display for BinOp {
             BinOp::Add => write!(f, "addl"),
             BinOp::Sub => write!(f, "subl"),
             BinOp::Mul => write!(f, "imull"),
+            BinOp::And => write!(f, "andl"),
+            BinOp::Or => write!(f, "orl"),
+            BinOp::Xor => write!(f, "xorl"),
+            BinOp::LShift => write!(f, "sall"),
+            BinOp::RShift => write!(f, "sarl"),
         }
     }
 }

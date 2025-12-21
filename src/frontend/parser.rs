@@ -38,6 +38,11 @@ pub enum BinaryOp {
     Multiplication,
     Division,
     Modulo,
+    And,
+    Or,
+    Xor,
+    LShift,
+    RShift,
 }
 
 impl fmt::Display for Ast {
@@ -91,6 +96,11 @@ impl fmt::Display for BinaryOp {
             BinaryOp::Multiplication => write!(f, "*"),
             BinaryOp::Division => write!(f, "/"),
             BinaryOp::Modulo => write!(f, "%"),
+            BinaryOp::And => write!(f, "&"),
+            BinaryOp::Or => write!(f, "|"),
+            BinaryOp::Xor => write!(f, "^"),
+            BinaryOp::LShift => write!(f, "<<"),
+            BinaryOp::RShift => write!(f, ">>"),
         }
     }
 }
@@ -139,6 +149,11 @@ fn parse_binop(tokens: &mut VecDeque<Token>) -> Result<BinaryOp> {
         Some(Token::Multiplication) => Ok(BinaryOp::Multiplication),
         Some(Token::Division) => Ok(BinaryOp::Division),
         Some(Token::Modulo) => Ok(BinaryOp::Modulo),
+        Some(Token::And) => Ok(BinaryOp::And),
+        Some(Token::Or) => Ok(BinaryOp::Or),
+        Some(Token::Xor) => Ok(BinaryOp::Xor),
+        Some(Token::LShift) => Ok(BinaryOp::LShift),
+        Some(Token::RShift) => Ok(BinaryOp::RShift),
         Some(x) => bail!("Expected an identifier but found {}", x),
         None => bail!("Expected an identifier but file ended"),
     }
