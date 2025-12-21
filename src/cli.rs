@@ -3,9 +3,11 @@ use crate::frontend::ir;
 use crate::frontend::lex;
 use crate::frontend::parser;
 use anyhow::Result;
+use anyhow::bail;
 use clap::Parser;
 use std::fs;
 use std::fs::File;
+use std::io;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
@@ -43,13 +45,19 @@ pub fn cli() -> Result<()> {
     let mut binary_file = args.file.clone();
     _ = binary_file.set_extension("");
 
-    let _ = Command::new("gcc")
+    let output = Command::new("gcc")
         .arg("-E")
         .arg("-P")
         .arg(args.file)
         .arg("-o")
         .arg(&preprocessed_file)
         .output()?;
+
+    if !output.status.success() {
+        io::stdout().write_all(&output.stdout)?;
+        io::stderr().write_all(&output.stderr)?;
+        bail!("Could not preprocess file");
+    }
 
     let content = fs::read_to_string(&preprocessed_file)?;
     fs::remove_file(preprocessed_file)?;
@@ -85,13 +93,19 @@ pub fn cli() -> Result<()> {
     let mut file = File::create(&asm_file)?;
     write!(file, "{}", asm)?;
 
-    let _ = Command::new("gcc")
+    let output = Command::new("gcc")
         .arg(&asm_file)
         .arg("-o")
         .arg(binary_file)
         .output()?;
 
     fs::remove_file(asm_file)?;
+
+    if !output.status.success() {
+        io::stdout().write_all(&output.stdout)?;
+        io::stderr().write_all(&output.stderr)?;
+        bail!("Could not assemble and link file");
+    }
 
     Ok(())
 }
