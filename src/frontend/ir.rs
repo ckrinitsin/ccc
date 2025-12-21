@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Result, bail};
 use std::{
     fmt,
     sync::atomic::{AtomicUsize, Ordering},
@@ -20,6 +20,11 @@ pub enum Function {
 pub enum Instruction {
     Unary(UnOp, Operand, Operand),
     Binary(BinOp, Operand, Operand, Operand),
+    Copy(Operand, Operand),
+    Jump(String),
+    JumpIfZero(Operand, String),
+    JumpIfNotZero(Operand, String),
+    Label(String),
     Ret(Operand),
 }
 
@@ -33,6 +38,7 @@ pub enum Operand {
 pub enum UnOp {
     Complement,
     Negation,
+    Not,
 }
 
 #[derive(Debug, PartialEq)]
@@ -47,12 +53,18 @@ pub enum BinOp {
     Xor,
     LShift,
     RShift,
+    Equal,
+    NEqual,
+    Less,
+    Greater,
+    LessEq,
+    GreaterEq,
 }
 
 impl fmt::Display for TAC {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            TAC::Program(x) => write!(f, "{}\n", x),
+            TAC::Program(x) => write!(f, "{}", x),
         }
     }
 }
@@ -79,6 +91,15 @@ impl fmt::Display for Instruction {
                 write!(f, "{} = {}{}{}", dst, src1, op, src2)
             }
             Instruction::Ret(val) => write!(f, "return {}", val),
+            Instruction::Copy(src, dst) => write!(f, "{} = {}", dst, src),
+            Instruction::Jump(label) => write!(f, "Jump({})", label),
+            Instruction::JumpIfZero(operand, label) => {
+                write!(f, "JumpIfZero({}, {})", operand, label)
+            }
+            Instruction::JumpIfNotZero(operand, label) => {
+                write!(f, "JumpIfNotZero({}, {})", operand, label)
+            }
+            Instruction::Label(label) => write!(f, "\n{}:", label),
         }
     }
 }
@@ -97,6 +118,7 @@ impl fmt::Display for UnOp {
         match self {
             UnOp::Complement => write!(f, "~"),
             UnOp::Negation => write!(f, "-"),
+            UnOp::Not => write!(f, "!"),
         }
     }
 }
@@ -114,21 +136,34 @@ impl fmt::Display for BinOp {
             BinOp::Xor => write!(f, "^"),
             BinOp::LShift => write!(f, "<<"),
             BinOp::RShift => write!(f, ">>"),
+            BinOp::Equal => write!(f, "=="),
+            BinOp::NEqual => write!(f, "!="),
+            BinOp::Less => write!(f, "<"),
+            BinOp::Greater => write!(f, ">"),
+            BinOp::LessEq => write!(f, "<="),
+            BinOp::GreaterEq => write!(f, ">="),
         }
     }
 }
 
-static COUNTER: AtomicUsize = AtomicUsize::new(0);
+static COUNTER_TMP: AtomicUsize = AtomicUsize::new(0);
+static COUNTER_LABEL: AtomicUsize = AtomicUsize::new(0);
 
 fn gen_temp() -> Operand {
-    let counter = COUNTER.fetch_add(1, Ordering::SeqCst);
-    Operand::Variable("tmp.".to_owned() + &counter.to_string())
+    let counter = COUNTER_TMP.fetch_add(1, Ordering::SeqCst);
+    Operand::Variable("tmp.".to_string() + &counter.to_string())
+}
+
+fn gen_label() -> String {
+    let counter = COUNTER_LABEL.fetch_add(1, Ordering::SeqCst);
+    "_".to_string() + &counter.to_string()
 }
 
 fn parse_unary_op(expr: parser::UnaryOp) -> Result<UnOp> {
     match expr {
         parser::UnaryOp::Complement => Ok(UnOp::Complement),
         parser::UnaryOp::Negation => Ok(UnOp::Negation),
+        parser::UnaryOp::Not => Ok(UnOp::Not),
     }
 }
 
@@ -144,6 +179,13 @@ fn parse_binary_op(expr: parser::BinaryOp) -> Result<BinOp> {
         parser::BinaryOp::Xor => Ok(BinOp::Xor),
         parser::BinaryOp::LShift => Ok(BinOp::LShift),
         parser::BinaryOp::RShift => Ok(BinOp::RShift),
+        parser::BinaryOp::Equal => Ok(BinOp::Equal),
+        parser::BinaryOp::NEqual => Ok(BinOp::NEqual),
+        parser::BinaryOp::Less => Ok(BinOp::Less),
+        parser::BinaryOp::Greater => Ok(BinOp::Greater),
+        parser::BinaryOp::LessEq => Ok(BinOp::LessEq),
+        parser::BinaryOp::GreaterEq => Ok(BinOp::GreaterEq),
+        x => bail!("{} should be handled seperately", x),
     }
 }
 
@@ -159,6 +201,40 @@ fn parse_expression(
             let op = parse_unary_op(unary_op)?;
 
             instructions.push(Instruction::Unary(op, src, dst.clone()));
+
+            Ok(dst)
+        }
+        parser::Expression::Binary(
+            binary_op @ (parser::BinaryOp::LAnd | parser::BinaryOp::LOr),
+            expression1,
+            expression2,
+        ) => {
+            let label = gen_label();
+            let end_label = label.to_string() + "_end";
+            let src1 = parse_expression(*expression1, instructions)?;
+            let dst = gen_temp();
+            if binary_op == parser::BinaryOp::LAnd {
+                instructions.push(Instruction::JumpIfZero(src1, label.clone()));
+            } else {
+                instructions.push(Instruction::JumpIfNotZero(src1, label.clone()));
+            }
+
+            let src2 = parse_expression(*expression2, instructions)?;
+            if binary_op == parser::BinaryOp::LAnd {
+                instructions.push(Instruction::JumpIfZero(src2, label.clone()));
+                instructions.push(Instruction::Copy(Operand::Constant(1), dst.clone()));
+                instructions.push(Instruction::Jump(end_label.clone()));
+                instructions.push(Instruction::Label(label));
+                instructions.push(Instruction::Copy(Operand::Constant(0), dst.clone()));
+            } else {
+                instructions.push(Instruction::JumpIfNotZero(src2, label.clone()));
+                instructions.push(Instruction::Copy(Operand::Constant(0), dst.clone()));
+                instructions.push(Instruction::Jump(end_label.clone()));
+                instructions.push(Instruction::Label(label));
+                instructions.push(Instruction::Copy(Operand::Constant(1), dst.clone()));
+            }
+
+            instructions.push(Instruction::Label(end_label));
 
             Ok(dst)
         }
@@ -195,7 +271,8 @@ fn parse_function(fun: parser::Function) -> Result<Function> {
 }
 
 pub fn lift_to_ir(prog: parser::Ast) -> Result<TAC> {
-    COUNTER.store(0, Ordering::SeqCst);
+    COUNTER_TMP.store(0, Ordering::SeqCst);
+    COUNTER_LABEL.store(0, Ordering::SeqCst);
     match prog {
         parser::Ast::Program(fun) => Ok(TAC::Program(parse_function(fun)?)),
     }

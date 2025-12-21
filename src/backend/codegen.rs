@@ -17,8 +17,13 @@ pub enum Instruction {
     Mov(Operand, Operand),
     Unary(UnOp, Operand),
     Binary(BinOp, Operand, Operand),
+    Cmp(Operand, Operand),
     Idiv(Operand),
     Cdq,
+    Jump(String),
+    JmpCC(Condition, String),
+    SetCC(Condition, Operand),
+    Label(String),
     AllocStack(i32),
     Ret,
 }
@@ -35,7 +40,6 @@ pub enum Operand {
 pub enum Reg {
     RAX,
     RCX,
-    CL,
     RDX,
     R10,
     R11,
@@ -45,6 +49,16 @@ pub enum Reg {
 pub enum UnOp {
     Neg,
     Not,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Condition {
+    E,
+    NE,
+    G,
+    GE,
+    L,
+    LE,
 }
 
 #[derive(Debug, PartialEq)]
@@ -66,10 +80,23 @@ fn parse_operand(expr: ir::Operand) -> Result<Operand> {
     }
 }
 
+fn parse_condition(bin_op: ir::BinOp) -> Result<Condition> {
+    match bin_op {
+        ir::BinOp::Equal => Ok(Condition::E),
+        ir::BinOp::NEqual => Ok(Condition::NE),
+        ir::BinOp::Less => Ok(Condition::L),
+        ir::BinOp::Greater => Ok(Condition::G),
+        ir::BinOp::LessEq => Ok(Condition::LE),
+        ir::BinOp::GreaterEq => Ok(Condition::GE),
+        x => bail!("{} doesn't produce a condition", x),
+    }
+}
+
 fn parse_unary(unary: ir::UnOp) -> Result<UnOp> {
     match unary {
         ir::UnOp::Complement => Ok(UnOp::Not),
         ir::UnOp::Negation => Ok(UnOp::Neg),
+        ir::UnOp::Not => bail!("! should be handled seperately"),
     }
 }
 
@@ -91,6 +118,12 @@ fn parse_instructions(instructions: Vec<ir::Instruction>) -> Result<Vec<Instruct
     let mut result = Vec::new();
     for instr in instructions {
         match instr {
+            ir::Instruction::Unary(ir::UnOp::Not, src, dst) => {
+                let dst = parse_operand(dst)?;
+                result.push(Instruction::Cmp(Operand::Immediate(0), parse_operand(src)?));
+                result.push(Instruction::Mov(Operand::Immediate(0), dst.clone()));
+                result.push(Instruction::SetCC(Condition::E, dst));
+            }
             ir::Instruction::Unary(un_op, src, dst) => {
                 let dst = parse_operand(dst)?;
                 result.push(Instruction::Mov(parse_operand(src)?, dst.clone()));
@@ -141,9 +174,25 @@ fn parse_instructions(instructions: Vec<ir::Instruction>) -> Result<Vec<Instruct
                 ));
                 result.push(Instruction::Binary(
                     parse_binary(bin_op)?,
-                    Operand::Register(Reg::CL),
+                    Operand::Register(Reg::RCX),
                     dst,
                 ));
+            }
+            ir::Instruction::Binary(
+                bin_op @ (ir::BinOp::Equal
+                | ir::BinOp::NEqual
+                | ir::BinOp::Less
+                | ir::BinOp::LessEq
+                | ir::BinOp::Greater
+                | ir::BinOp::GreaterEq),
+                src1,
+                src2,
+                dst,
+            ) => {
+                let dst = parse_operand(dst)?;
+                result.push(Instruction::Cmp(parse_operand(src2)?, parse_operand(src1)?));
+                result.push(Instruction::Mov(Operand::Immediate(0), dst.clone()));
+                result.push(Instruction::SetCC(parse_condition(bin_op)?, dst));
             }
             ir::Instruction::Binary(bin_op, src1, src2, dst) => {
                 let dst = parse_operand(dst)?;
@@ -154,6 +203,25 @@ fn parse_instructions(instructions: Vec<ir::Instruction>) -> Result<Vec<Instruct
                     dst,
                 ));
             }
+            ir::Instruction::Copy(src, dst) => {
+                result.push(Instruction::Mov(parse_operand(src)?, parse_operand(dst)?))
+            }
+            ir::Instruction::Jump(label) => result.push(Instruction::Jump(label)),
+            ir::Instruction::JumpIfZero(operand, label) => {
+                result.push(Instruction::Cmp(
+                    Operand::Immediate(0),
+                    parse_operand(operand)?,
+                ));
+                result.push(Instruction::JmpCC(Condition::E, label));
+            }
+            ir::Instruction::JumpIfNotZero(operand, label) => {
+                result.push(Instruction::Cmp(
+                    Operand::Immediate(0),
+                    parse_operand(operand)?,
+                ));
+                result.push(Instruction::JmpCC(Condition::NE, label));
+            }
+            ir::Instruction::Label(label) => result.push(Instruction::Label(label)),
         }
     }
     Ok(result)
@@ -202,9 +270,18 @@ fn replace_pseudo(asm: Asm) -> Result<Asm> {
                             let n_op2 = replace_pseudo_operand(op2, &mut hash_map)?;
                             instr_pseudoless.push(Instruction::Mov(n_op1, n_op2));
                         }
+                        Instruction::Cmp(op1, op2) => {
+                            let n_op1 = replace_pseudo_operand(op1, &mut hash_map)?;
+                            let n_op2 = replace_pseudo_operand(op2, &mut hash_map)?;
+                            instr_pseudoless.push(Instruction::Cmp(n_op1, n_op2));
+                        }
                         Instruction::Unary(un_op, op) => {
                             let n_op = replace_pseudo_operand(op, &mut hash_map)?;
                             instr_pseudoless.push(Instruction::Unary(un_op, n_op));
+                        }
+                        Instruction::SetCC(cond, op) => {
+                            let n_op = replace_pseudo_operand(op, &mut hash_map)?;
+                            instr_pseudoless.push(Instruction::SetCC(cond, n_op));
                         }
                         Instruction::Binary(bin_op, op1, op2) => {
                             let n_op1 = replace_pseudo_operand(op1, &mut hash_map)?;
@@ -253,6 +330,26 @@ fn fix_mem_accesses(asm: Asm) -> Result<Asm> {
                                 new_instr.push(Instruction::Mov(Operand::Register(Reg::R10), op2));
                             } else {
                                 new_instr.push(Instruction::Mov(op1, op2));
+                            }
+                        }
+                        Instruction::Cmp(op1, op2) => {
+                            if is_mem_access(&op1) && is_mem_access(&op2) {
+                                new_instr.push(Instruction::Mov(op1, Operand::Register(Reg::R10)));
+                                new_instr.push(Instruction::Cmp(Operand::Register(Reg::R10), op2));
+                            } else {
+                                match op2 {
+                                    Operand::Immediate(c) => {
+                                        new_instr.push(Instruction::Mov(
+                                            Operand::Immediate(c),
+                                            Operand::Register(Reg::R11),
+                                        ));
+                                        new_instr.push(Instruction::Cmp(
+                                            op1,
+                                            Operand::Register(Reg::R11),
+                                        ));
+                                    }
+                                    _ => new_instr.push(Instruction::Cmp(op1, op2)),
+                                }
                             }
                         }
                         Instruction::Idiv(Operand::Immediate(c)) => {

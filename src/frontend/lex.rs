@@ -27,17 +27,35 @@ pub enum Token {
     Xor,
     LShift,
     RShift,
+    Not,
+    LAnd,
+    LOr,
+    Equal,
+    NEqual,
+    Less,
+    Greater,
+    LessEq,
+    GreaterEq,
 }
 
 impl Token {
     pub fn patterns() -> Vec<(Regex, fn(&str) -> Token)> {
         vec![
             (Regex::new(r"\;").unwrap(), |_| Token::Semicolon),
+            (Regex::new(r"<<").unwrap(), |_| Token::LShift),
+            (Regex::new(r">>").unwrap(), |_| Token::RShift),
+            (Regex::new(r"\&\&").unwrap(), |_| Token::LAnd),
+            (Regex::new(r"\|\|").unwrap(), |_| Token::LOr),
+            (Regex::new(r"\=\=").unwrap(), |_| Token::Equal),
+            (Regex::new(r"\!\=").unwrap(), |_| Token::NEqual),
+            (Regex::new(r"<\=").unwrap(), |_| Token::LessEq),
+            (Regex::new(r">\=").unwrap(), |_| Token::GreaterEq),
+            (Regex::new(r"<").unwrap(), |_| Token::Less),
+            (Regex::new(r">").unwrap(), |_| Token::Greater),
+            (Regex::new(r"\!").unwrap(), |_| Token::Not),
             (Regex::new(r"\-\-").unwrap(), |_| Token::Decrement),
             (Regex::new(r"\-").unwrap(), |_| Token::Negation),
             (Regex::new(r"\+").unwrap(), |_| Token::Addition),
-            (Regex::new(r"<<").unwrap(), |_| Token::LShift),
-            (Regex::new(r">>").unwrap(), |_| Token::RShift),
             (Regex::new(r"\^").unwrap(), |_| Token::Xor),
             (Regex::new(r"\|").unwrap(), |_| Token::Or),
             (Regex::new(r"\&").unwrap(), |_| Token::And),
@@ -87,6 +105,15 @@ impl fmt::Display for Token {
             Token::Xor => write!(f, "^"),
             Token::LShift => write!(f, "<<"),
             Token::RShift => write!(f, ">>"),
+            Token::Not => write!(f, "!"),
+            Token::LAnd => write!(f, "&&"),
+            Token::LOr => write!(f, "||"),
+            Token::Equal => write!(f, "=="),
+            Token::NEqual => write!(f, "!="),
+            Token::Less => write!(f, "<"),
+            Token::Greater => write!(f, ">"),
+            Token::LessEq => write!(f, "<="),
+            Token::GreaterEq => write!(f, ">="),
         }
     }
 }
@@ -102,7 +129,22 @@ pub fn is_binary(token: &Token) -> bool {
         | Token::Or
         | Token::Xor
         | Token::LShift
-        | Token::RShift => true,
+        | Token::RShift
+        | Token::LAnd
+        | Token::LOr
+        | Token::Equal
+        | Token::NEqual
+        | Token::Less
+        | Token::Greater
+        | Token::LessEq
+        | Token::GreaterEq => true,
+        _ => false,
+    }
+}
+
+pub fn is_unary(token: &Token) -> bool {
+    match token {
+        Token::Negation | Token::Complement | Token::Not => true,
         _ => false,
     }
 }
@@ -110,11 +152,15 @@ pub fn is_binary(token: &Token) -> bool {
 pub fn precedence(token: &Token) -> usize {
     match token {
         Token::Multiplication | Token::Division | Token::Modulo => 50,
-        Token::Negation | Token::Addition => 40,
-        Token::LShift | Token::RShift => 30,
+        Token::Negation | Token::Addition => 45,
+        Token::LShift | Token::RShift => 40,
+        Token::Less | Token::LessEq | Token::Greater | Token::GreaterEq => 35,
+        Token::Equal | Token::NEqual => 30,
         Token::And => 25,
         Token::Xor => 20,
         Token::Or => 15,
+        Token::LAnd => 10,
+        Token::LOr => 5,
         _ => 0,
     }
 }

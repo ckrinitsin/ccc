@@ -29,6 +29,7 @@ pub enum Expression {
 pub enum UnaryOp {
     Complement,
     Negation,
+    Not,
 }
 
 #[derive(Debug, PartialEq)]
@@ -43,6 +44,14 @@ pub enum BinaryOp {
     Xor,
     LShift,
     RShift,
+    LAnd,
+    LOr,
+    Equal,
+    NEqual,
+    Less,
+    Greater,
+    LessEq,
+    GreaterEq,
 }
 
 impl fmt::Display for Ast {
@@ -84,6 +93,7 @@ impl fmt::Display for UnaryOp {
         match self {
             UnaryOp::Complement => write!(f, "~"),
             UnaryOp::Negation => write!(f, "-"),
+            UnaryOp::Not => write!(f, "!"),
         }
     }
 }
@@ -101,6 +111,14 @@ impl fmt::Display for BinaryOp {
             BinaryOp::Xor => write!(f, "^"),
             BinaryOp::LShift => write!(f, "<<"),
             BinaryOp::RShift => write!(f, ">>"),
+            BinaryOp::LAnd => write!(f, "&&"),
+            BinaryOp::LOr => write!(f, "||"),
+            BinaryOp::Equal => write!(f, "=="),
+            BinaryOp::NEqual => write!(f, "!="),
+            BinaryOp::Less => write!(f, "<"),
+            BinaryOp::Greater => write!(f, ">"),
+            BinaryOp::LessEq => write!(f, "<="),
+            BinaryOp::GreaterEq => write!(f, ">="),
         }
     }
 }
@@ -137,6 +155,7 @@ fn parse_unop(tokens: &mut VecDeque<Token>) -> Result<UnaryOp> {
     match tokens.pop_front() {
         Some(Token::Complement) => Ok(UnaryOp::Complement),
         Some(Token::Negation) => Ok(UnaryOp::Negation),
+        Some(Token::Not) => Ok(UnaryOp::Not),
         Some(x) => bail!("Expected an identifier but found {}", x),
         None => bail!("Expected an identifier but file ended"),
     }
@@ -154,6 +173,14 @@ fn parse_binop(tokens: &mut VecDeque<Token>) -> Result<BinaryOp> {
         Some(Token::Xor) => Ok(BinaryOp::Xor),
         Some(Token::LShift) => Ok(BinaryOp::LShift),
         Some(Token::RShift) => Ok(BinaryOp::RShift),
+        Some(Token::LAnd) => Ok(BinaryOp::LAnd),
+        Some(Token::LOr) => Ok(BinaryOp::LOr),
+        Some(Token::Equal) => Ok(BinaryOp::Equal),
+        Some(Token::NEqual) => Ok(BinaryOp::NEqual),
+        Some(Token::Less) => Ok(BinaryOp::Less),
+        Some(Token::LessEq) => Ok(BinaryOp::LessEq),
+        Some(Token::Greater) => Ok(BinaryOp::Greater),
+        Some(Token::GreaterEq) => Ok(BinaryOp::GreaterEq),
         Some(x) => bail!("Expected an identifier but found {}", x),
         None => bail!("Expected an identifier but file ended"),
     }
@@ -165,7 +192,7 @@ fn parse_factor(tokens: &mut VecDeque<Token>) -> Result<Expression> {
             let constant = parse_constant(tokens)?;
             Ok(Expression::Constant(constant))
         }
-        Token::Complement | Token::Negation => {
+        Token::Complement | Token::Negation | Token::Not => {
             let unop = parse_unop(tokens)?;
             let expr = parse_factor(tokens)?;
             Ok(Expression::Unary(unop, Box::new(expr)))
