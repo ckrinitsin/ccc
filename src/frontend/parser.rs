@@ -38,6 +38,8 @@ pub enum Expression {
     Binary(BinaryOp, Box<Expression>, Box<Expression>),
     Assignment(Box<Expression>, Box<Expression>),
     CompoundAssignment(BinaryOp, Box<Expression>, Box<Expression>),
+    PostIncr(Box<Expression>),
+    PostDecr(Box<Expression>),
 }
 
 #[derive(Debug, PartialEq)]
@@ -45,6 +47,8 @@ pub enum UnaryOp {
     Complement,
     Negation,
     Not,
+    Increment,
+    Decrement,
 }
 
 #[derive(Debug, PartialEq)]
@@ -110,7 +114,11 @@ fn expect_token(expect: Token, actual: Option<Token>) -> Result<()> {
     match actual {
         Some(x) => {
             if expect != x {
-                bail!("Expected {} but found {}", expect, x);
+                match x {
+                    Token::Identifier(val) => bail!("Expected {} but found {}", expect, val),
+                    Token::Constant(val) => bail!("Expected {} but found {}", expect, val),
+                    val => bail!("Expected {} but found {}", expect, val),
+                }
             }
             Ok(())
         }
@@ -118,6 +126,7 @@ fn expect_token(expect: Token, actual: Option<Token>) -> Result<()> {
     }
 }
 
+/* constant ::= An i64 */
 fn parse_constant(tokens: &mut VecDeque<Token>) -> Result<i64> {
     match tokens.pop_front() {
         Some(Token::Constant(x)) => Ok(x),
@@ -126,6 +135,7 @@ fn parse_constant(tokens: &mut VecDeque<Token>) -> Result<i64> {
     }
 }
 
+/* identifier ::= A String */
 fn parse_identifier(tokens: &mut VecDeque<Token>) -> Result<String> {
     match tokens.pop_front() {
         Some(Token::Identifier(x)) => Ok(x),
@@ -134,16 +144,20 @@ fn parse_identifier(tokens: &mut VecDeque<Token>) -> Result<String> {
     }
 }
 
+/* unop ::= "~" | "-" | ... | "--" */
 fn parse_unop(tokens: &mut VecDeque<Token>) -> Result<UnaryOp> {
     match tokens.pop_front() {
         Some(Token::Complement) => Ok(UnaryOp::Complement),
         Some(Token::Negation) => Ok(UnaryOp::Negation),
         Some(Token::Not) => Ok(UnaryOp::Not),
+        Some(Token::Increment) => Ok(UnaryOp::Increment),
+        Some(Token::Decrement) => Ok(UnaryOp::Decrement),
         Some(x) => bail!("Expected an identifier but found {}", x),
         None => bail!("Expected an identifier but file ended"),
     }
 }
 
+/* binop ::= "+" | "-" | ... | "=" */
 fn parse_binop(tokens: &mut VecDeque<Token>) -> Result<BinaryOp> {
     match tokens.pop_front() {
         Some(Token::Addition) => Ok(BinaryOp::Addition),
@@ -170,16 +184,12 @@ fn parse_binop(tokens: &mut VecDeque<Token>) -> Result<BinaryOp> {
     }
 }
 
-fn parse_factor(tokens: &mut VecDeque<Token>) -> Result<Expression> {
+/* first_expr ::= <constant> | <identifier> | "(" <exp> ")" */
+fn parse_first_expr(tokens: &mut VecDeque<Token>) -> Result<Expression> {
     match &tokens[0] {
         Token::Constant(_) => {
             let constant = parse_constant(tokens)?;
             Ok(Expression::Constant(constant))
-        }
-        Token::Complement | Token::Negation | Token::Not => {
-            let unop = parse_unop(tokens)?;
-            let expr = parse_factor(tokens)?;
-            Ok(Expression::Unary(unop, Box::new(expr)))
         }
         Token::OpenParanthesis => {
             expect_token(Token::OpenParanthesis, tokens.pop_front())?;
@@ -195,6 +205,37 @@ fn parse_factor(tokens: &mut VecDeque<Token>) -> Result<Expression> {
     }
 }
 
+/* postfixes ::= { "++" | "--" } */
+fn parse_postfixes(tokens: &mut VecDeque<Token>, expr: Expression) -> Result<Expression> {
+    match &tokens[0] {
+        Token::Increment => {
+            expect_token(Token::Increment, tokens.pop_front())?;
+            parse_postfixes(tokens, Expression::PostIncr(Box::new(expr)))
+        }
+        Token::Decrement => {
+            expect_token(Token::Decrement, tokens.pop_front())?;
+            parse_postfixes(tokens, Expression::PostDecr(Box::new(expr)))
+        }
+        _ => Ok(expr),
+    }
+}
+
+/* factor ::= <unop> <factor> | <first_expr> { "++" | "--" } */
+fn parse_factor(tokens: &mut VecDeque<Token>) -> Result<Expression> {
+    match &tokens[0] {
+        Token::Complement | Token::Negation | Token::Not | Token::Increment | Token::Decrement => {
+            let unop = parse_unop(tokens)?;
+            let expr = parse_factor(tokens)?;
+            Ok(Expression::Unary(unop, Box::new(expr)))
+        }
+        _ => {
+            let expr = parse_first_expr(tokens)?;
+            parse_postfixes(tokens, expr)
+        }
+    }
+}
+
+/* expression ::= <factor> | <expression> <binop> <expression> */
 fn parse_expression(tokens: &mut VecDeque<Token>, order: usize) -> Result<Expression> {
     let mut left = parse_factor(tokens)?;
     while lex::is_binary(&tokens[0]) && lex::precedence(&tokens[0]) >= order {
@@ -215,6 +256,7 @@ fn parse_expression(tokens: &mut VecDeque<Token>, order: usize) -> Result<Expres
     Ok(left)
 }
 
+/* statement ::= "return" <expression> ";" | ";" | <expression> ";" */
 fn parse_statement(tokens: &mut VecDeque<Token>) -> Result<Statement> {
     match &tokens[0] {
         Token::Return => {
@@ -235,6 +277,7 @@ fn parse_statement(tokens: &mut VecDeque<Token>) -> Result<Statement> {
     }
 }
 
+/* declaration ::= "int" <identifier> [ "=" <expression> ] ";" */
 fn parse_declaration(tokens: &mut VecDeque<Token>) -> Result<Declaration> {
     expect_token(Token::Int, tokens.pop_front())?;
     let id = parse_identifier(tokens)?;
@@ -250,6 +293,7 @@ fn parse_declaration(tokens: &mut VecDeque<Token>) -> Result<Declaration> {
     }
 }
 
+/* block-item ::= <statement> | <declaration> */
 fn parse_block_item(tokens: &mut VecDeque<Token>) -> Result<BlockItem> {
     match &tokens[0] {
         Token::Int => Ok(BlockItem::D(parse_declaration(tokens)?)),
@@ -257,6 +301,7 @@ fn parse_block_item(tokens: &mut VecDeque<Token>) -> Result<BlockItem> {
     }
 }
 
+/* function ::= "int" <identifier> "(" "void" ")" "{" { <block-item> } "}" */
 fn parse_function(tokens: &mut VecDeque<Token>) -> Result<Function> {
     expect_token(Token::Int, tokens.pop_front())?;
     let id = parse_identifier(tokens)?;
@@ -272,6 +317,7 @@ fn parse_function(tokens: &mut VecDeque<Token>) -> Result<Function> {
     Ok(Function::Function(id, body))
 }
 
+/* program ::= <function> */
 pub fn parse_tokens(mut tokens: VecDeque<Token>) -> Result<Ast> {
     let result = Ast::Program(parse_function(&mut tokens)?);
 

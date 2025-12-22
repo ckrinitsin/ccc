@@ -49,6 +49,8 @@ pub enum Reg {
 pub enum UnOp {
     Neg,
     Not,
+    Dec,
+    Inc,
 }
 
 #[derive(Debug, PartialEq)]
@@ -96,6 +98,8 @@ fn parse_unary(unary: ir::UnOp) -> Result<UnOp> {
     match unary {
         ir::UnOp::Complement => Ok(UnOp::Not),
         ir::UnOp::Negation => Ok(UnOp::Neg),
+        ir::UnOp::Increment => Ok(UnOp::Inc),
+        ir::UnOp::Decrement => Ok(UnOp::Dec),
         ir::UnOp::Not => bail!("! should be handled seperately"),
     }
 }

@@ -193,7 +193,9 @@ pub fn is_binary(token: &Token) -> bool {
 
 pub fn is_unary(token: &Token) -> bool {
     match token {
-        Token::Negation | Token::Complement | Token::Not => true,
+        Token::Negation | Token::Complement | Token::Not | Token::Increment | Token::Decrement => {
+            true
+        }
         _ => false,
     }
 }

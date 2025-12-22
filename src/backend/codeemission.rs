@@ -94,6 +94,8 @@ impl fmt::Display for UnOp {
         match self {
             UnOp::Neg => write!(f, "negl"),
             UnOp::Not => write!(f, "notl"),
+            UnOp::Inc => write!(f, "incl"),
+            UnOp::Dec => write!(f, "decl"),
         }
     }
 }

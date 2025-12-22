@@ -39,6 +39,8 @@ pub enum UnOp {
     Complement,
     Negation,
     Not,
+    Increment,
+    Decrement,
 }
 
 #[derive(Debug, PartialEq)]
@@ -119,6 +121,8 @@ impl fmt::Display for UnOp {
             UnOp::Complement => write!(f, "~"),
             UnOp::Negation => write!(f, "-"),
             UnOp::Not => write!(f, "!"),
+            UnOp::Increment => write!(f, "++"),
+            UnOp::Decrement => write!(f, "--"),
         }
     }
 }
@@ -164,6 +168,8 @@ fn parse_unary_op(expr: parser::UnaryOp) -> Result<UnOp> {
         parser::UnaryOp::Complement => Ok(UnOp::Complement),
         parser::UnaryOp::Negation => Ok(UnOp::Negation),
         parser::UnaryOp::Not => Ok(UnOp::Not),
+        parser::UnaryOp::Increment => Ok(UnOp::Increment),
+        parser::UnaryOp::Decrement => Ok(UnOp::Decrement),
     }
 }
 
@@ -197,9 +203,14 @@ fn parse_expression(
         parser::Expression::Constant(c) => Ok(Operand::Constant(c)),
         parser::Expression::Unary(unary_op, expression) => {
             let src = parse_expression(*expression, instructions)?;
-            let dst = gen_temp();
             let op = parse_unary_op(unary_op)?;
 
+            let dst;
+            if matches!(op, UnOp::Increment) || matches!(op, UnOp::Decrement) {
+                dst = src.clone();
+            } else {
+                dst = gen_temp();
+            }
             instructions.push(Instruction::Unary(op, src, dst.clone()));
 
             Ok(dst)
@@ -271,6 +282,30 @@ fn parse_expression(
             } else {
                 bail!("Lvalue of Assignment must be a variable!");
             }
+        }
+        parser::Expression::PostIncr(expr) => {
+            let dst = gen_temp();
+            let src = parse_expression(*expr, instructions)?;
+            instructions.push(Instruction::Copy(src.clone(), dst.clone()));
+            instructions.push(Instruction::Binary(
+                BinOp::Addition,
+                src.clone(),
+                Operand::Constant(1),
+                src,
+            ));
+            Ok(dst)
+        }
+        parser::Expression::PostDecr(expr) => {
+            let dst = gen_temp();
+            let src = parse_expression(*expr, instructions)?;
+            instructions.push(Instruction::Copy(src.clone(), dst.clone()));
+            instructions.push(Instruction::Binary(
+                BinOp::Subtraction,
+                src.clone(),
+                Operand::Constant(1),
+                src,
+            ));
+            Ok(dst)
         }
     }
 }

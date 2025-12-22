@@ -3,7 +3,9 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use crate::frontend::parser::{Ast, BlockItem, Declaration, Expression, Function, Statement};
+use crate::frontend::parser::{
+    Ast, BlockItem, Declaration, Expression, Function, Statement, UnaryOp,
+};
 use anyhow::{Result, bail};
 
 fn gen_temp_local(id: String) -> String {
@@ -23,10 +25,17 @@ fn resolve_expression(
                 bail!("Undeclared variable {}", x);
             }
         }
-        Expression::Unary(unary_op, expression) => Ok(Expression::Unary(
-            unary_op,
-            Box::new(resolve_expression(*expression, hash_map)?),
-        )),
+        Expression::Unary(unary_op, expression) => {
+            if (matches!(unary_op, UnaryOp::Increment) || matches!(unary_op, UnaryOp::Decrement))
+                && !matches!(*expression, Expression::Variable(_))
+            {
+                bail!("{:?} is not a valid lvalue", *expression);
+            }
+            Ok(Expression::Unary(
+                unary_op,
+                Box::new(resolve_expression(*expression, hash_map)?),
+            ))
+        }
         Expression::Binary(binary_op, left, right) => Ok(Expression::Binary(
             binary_op,
             Box::new(resolve_expression(*left, hash_map)?),
@@ -50,6 +59,22 @@ fn resolve_expression(
                 Box::new(resolve_expression(*left, hash_map)?),
                 Box::new(resolve_expression(*right, hash_map)?),
             ))
+        }
+        Expression::PostIncr(expr) => {
+            if !matches!(*expr, Expression::Variable(_)) {
+                bail!("{:?} is not a valid lvalue", *expr);
+            }
+            Ok(Expression::PostIncr(Box::new(resolve_expression(
+                *expr, hash_map,
+            )?)))
+        }
+        Expression::PostDecr(expr) => {
+            if !matches!(*expr, Expression::Variable(_)) {
+                bail!("{:?} is not a valid lvalue", *expr);
+            }
+            Ok(Expression::PostDecr(Box::new(resolve_expression(
+                *expr, hash_map,
+            )?)))
         }
         c => Ok(c),
     }
