@@ -16,6 +16,7 @@ pub enum Token {
     CloseBrace,
     Semicolon,
     Decrement,
+    Increment,
     Negation,
     Complement,
     Addition,
@@ -37,24 +38,45 @@ pub enum Token {
     LessEq,
     GreaterEq,
     Assignment,
+    CAddition,
+    CNegation,
+    CMultiplication,
+    CDivision,
+    CModulo,
+    CAnd,
+    COr,
+    CXor,
+    CLShift,
+    CRShift,
 }
 
 impl Token {
     pub fn patterns() -> Vec<(Regex, fn(&str) -> Token)> {
         vec![
             (Regex::new(r"\;").unwrap(), |_| Token::Semicolon),
-            (Regex::new(r"<<").unwrap(), |_| Token::LShift),
-            (Regex::new(r">>").unwrap(), |_| Token::RShift),
+            (Regex::new(r"<<\=").unwrap(), |_| Token::CLShift),
+            (Regex::new(r">>\=").unwrap(), |_| Token::CRShift),
+            (Regex::new(r"\-\=").unwrap(), |_| Token::CNegation),
+            (Regex::new(r"\+\=").unwrap(), |_| Token::CAddition),
+            (Regex::new(r"\^\=").unwrap(), |_| Token::CXor),
+            (Regex::new(r"\|\=").unwrap(), |_| Token::COr),
+            (Regex::new(r"\&\=").unwrap(), |_| Token::CAnd),
+            (Regex::new(r"\*\=").unwrap(), |_| Token::CMultiplication),
+            (Regex::new(r"\/\=").unwrap(), |_| Token::CDivision),
+            (Regex::new(r"\%\=").unwrap(), |_| Token::CModulo),
             (Regex::new(r"\&\&").unwrap(), |_| Token::LAnd),
             (Regex::new(r"\|\|").unwrap(), |_| Token::LOr),
             (Regex::new(r"\=\=").unwrap(), |_| Token::Equal),
             (Regex::new(r"\!\=").unwrap(), |_| Token::NEqual),
+            (Regex::new(r"<<").unwrap(), |_| Token::LShift),
+            (Regex::new(r">>").unwrap(), |_| Token::RShift),
             (Regex::new(r"<\=").unwrap(), |_| Token::LessEq),
             (Regex::new(r">\=").unwrap(), |_| Token::GreaterEq),
+            (Regex::new(r"\!").unwrap(), |_| Token::Not),
+            (Regex::new(r"\+\+").unwrap(), |_| Token::Increment),
+            (Regex::new(r"\-\-").unwrap(), |_| Token::Decrement),
             (Regex::new(r"<").unwrap(), |_| Token::Less),
             (Regex::new(r">").unwrap(), |_| Token::Greater),
-            (Regex::new(r"\!").unwrap(), |_| Token::Not),
-            (Regex::new(r"\-\-").unwrap(), |_| Token::Decrement),
             (Regex::new(r"\-").unwrap(), |_| Token::Negation),
             (Regex::new(r"\=").unwrap(), |_| Token::Assignment),
             (Regex::new(r"\+").unwrap(), |_| Token::Addition),
@@ -96,9 +118,10 @@ impl fmt::Display for Token {
             Token::CloseBrace => write!(f, "}}"),
             Token::Semicolon => write!(f, ";"),
             Token::Decrement => write!(f, "--"),
-            Token::Negation => write!(f, "-"),
+            Token::Increment => write!(f, "++"),
             Token::Assignment => write!(f, "="),
             Token::Complement => write!(f, "~"),
+            Token::Negation => write!(f, "-"),
             Token::Addition => write!(f, "+"),
             Token::Multiplication => write!(f, "*"),
             Token::Division => write!(f, "/"),
@@ -108,6 +131,18 @@ impl fmt::Display for Token {
             Token::Xor => write!(f, "^"),
             Token::LShift => write!(f, "<<"),
             Token::RShift => write!(f, ">>"),
+
+            Token::CNegation => write!(f, "-="),
+            Token::CAddition => write!(f, "+="),
+            Token::CMultiplication => write!(f, "*="),
+            Token::CDivision => write!(f, "/="),
+            Token::CModulo => write!(f, "%="),
+            Token::CAnd => write!(f, "&="),
+            Token::COr => write!(f, "|="),
+            Token::CXor => write!(f, "^="),
+            Token::CLShift => write!(f, "<<="),
+            Token::CRShift => write!(f, ">>="),
+
             Token::Not => write!(f, "!"),
             Token::LAnd => write!(f, "&&"),
             Token::LOr => write!(f, "||"),
@@ -130,6 +165,16 @@ pub fn is_binary(token: &Token) -> bool {
         | Token::Modulo
         | Token::And
         | Token::Assignment
+        | Token::CAddition
+        | Token::CNegation
+        | Token::CMultiplication
+        | Token::CDivision
+        | Token::CModulo
+        | Token::CAnd
+        | Token::COr
+        | Token::CXor
+        | Token::CLShift
+        | Token::CRShift
         | Token::Or
         | Token::Xor
         | Token::LShift
@@ -165,7 +210,17 @@ pub fn precedence(token: &Token) -> usize {
         Token::Or => 15,
         Token::LAnd => 10,
         Token::LOr => 5,
-        Token::Assignment => 2,
+        Token::CAddition
+        | Token::CNegation
+        | Token::CMultiplication
+        | Token::CDivision
+        | Token::CModulo
+        | Token::CAnd
+        | Token::COr
+        | Token::CXor
+        | Token::CLShift
+        | Token::CRShift
+        | Token::Assignment => 2,
         _ => 0,
     }
 }

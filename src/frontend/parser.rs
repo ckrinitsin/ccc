@@ -37,6 +37,7 @@ pub enum Expression {
     Unary(UnaryOp, Box<Expression>),
     Binary(BinaryOp, Box<Expression>, Box<Expression>),
     Assignment(Box<Expression>, Box<Expression>),
+    CompoundAssignment(BinaryOp, Box<Expression>, Box<Expression>),
 }
 
 #[derive(Debug, PartialEq)]
@@ -66,7 +67,43 @@ pub enum BinaryOp {
     Greater,
     LessEq,
     GreaterEq,
+
     Assignment,
+}
+
+fn get_compound_operator(tok: Option<Token>) -> Result<Option<BinaryOp>> {
+    match tok {
+        Some(Token::Assignment) => Ok(None),
+        Some(Token::CAddition) => Ok(Some(BinaryOp::Addition)),
+        Some(Token::CNegation) => Ok(Some(BinaryOp::Subtraction)),
+        Some(Token::CMultiplication) => Ok(Some(BinaryOp::Multiplication)),
+        Some(Token::CDivision) => Ok(Some(BinaryOp::Division)),
+        Some(Token::CModulo) => Ok(Some(BinaryOp::Modulo)),
+        Some(Token::CAnd) => Ok(Some(BinaryOp::And)),
+        Some(Token::COr) => Ok(Some(BinaryOp::Or)),
+        Some(Token::CXor) => Ok(Some(BinaryOp::Xor)),
+        Some(Token::CLShift) => Ok(Some(BinaryOp::LShift)),
+        Some(Token::CRShift) => Ok(Some(BinaryOp::RShift)),
+        Some(_) => bail!("Expected compound operator"),
+        None => bail!("End of file"),
+    }
+}
+
+fn is_assignment(tok: &Token) -> bool {
+    match tok {
+        Token::Assignment
+        | Token::CAddition
+        | Token::CNegation
+        | Token::CMultiplication
+        | Token::CDivision
+        | Token::CModulo
+        | Token::CAnd
+        | Token::COr
+        | Token::CXor
+        | Token::CLShift
+        | Token::CRShift => true,
+        _ => false,
+    }
 }
 
 fn expect_token(expect: Token, actual: Option<Token>) -> Result<()> {
@@ -162,10 +199,13 @@ fn parse_expression(tokens: &mut VecDeque<Token>, order: usize) -> Result<Expres
     let mut left = parse_factor(tokens)?;
     while lex::is_binary(&tokens[0]) && lex::precedence(&tokens[0]) >= order {
         let prec = lex::precedence(&tokens[0]);
-        if Token::Assignment == tokens[0] {
-            expect_token(Token::Assignment, tokens.pop_front())?;
+        if is_assignment(&tokens[0]) {
+            let compound_op = tokens.pop_front();
             let right = parse_expression(tokens, prec)?;
-            left = Expression::Assignment(Box::new(left), Box::new(right));
+            left = match get_compound_operator(compound_op)? {
+                None => Expression::Assignment(Box::new(left), Box::new(right)),
+                Some(x) => Expression::CompoundAssignment(x, Box::new(left), Box::new(right)),
+            };
         } else {
             let op = parse_binop(tokens)?;
             let right = parse_expression(tokens, prec + 1)?;

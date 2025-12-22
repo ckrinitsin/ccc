@@ -41,6 +41,16 @@ fn resolve_expression(
                 Box::new(resolve_expression(*right, hash_map)?),
             ))
         }
+        Expression::CompoundAssignment(binary_op, left, right) => {
+            if !matches!(*left, Expression::Variable(_)) {
+                bail!("{:?} is not a valid lvalue", *left);
+            }
+            Ok(Expression::CompoundAssignment(
+                binary_op,
+                Box::new(resolve_expression(*left, hash_map)?),
+                Box::new(resolve_expression(*right, hash_map)?),
+            ))
+        }
         c => Ok(c),
     }
 }

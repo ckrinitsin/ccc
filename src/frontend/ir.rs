@@ -258,6 +258,20 @@ fn parse_expression(
                 bail!("Lvalue of Assignment must be a variable!");
             }
         }
+        parser::Expression::CompoundAssignment(binary_op, var, right) => {
+            if let parser::Expression::Variable(v) = *var {
+                let right = parse_expression(*right, instructions)?;
+                instructions.push(Instruction::Binary(
+                    parse_binary_op(binary_op)?,
+                    Operand::Variable(v.clone()),
+                    right,
+                    Operand::Variable(v.clone()),
+                ));
+                Ok(Operand::Variable(v))
+            } else {
+                bail!("Lvalue of Assignment must be a variable!");
+            }
+        }
     }
 }
 
