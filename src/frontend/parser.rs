@@ -220,7 +220,7 @@ fn parse_postfixes(tokens: &mut VecDeque<Token>, expr: Expression) -> Result<Exp
     }
 }
 
-/* factor ::= <unop> <factor> | <first_expr> { "++" | "--" } */
+/* factor ::= <unop> <factor> | <first_expr> <postfixes> */
 fn parse_factor(tokens: &mut VecDeque<Token>) -> Result<Expression> {
     match &tokens[0] {
         Token::Complement | Token::Negation | Token::Not | Token::Increment | Token::Decrement => {

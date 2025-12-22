@@ -10,4 +10,17 @@ Supports:
 - Binary arithmetic and logical operators (+, -, \*, /, %, <<, >>, &, |)
 - Logical and relational operators (&&, ||, <, >, <=, >=, !=, ==)
 - Local variables (int)
+- Compound assignments and post/pre (inc/dec)rement (+=, /=, <<, ... and ++\<var\>, \<var\>-- ...) 
 - ~~If Statements~~
+
+Here is an example of now compilable c code:
+```
+int main(void) {
+    int a = 2 >> 1;
+    int b = 1;
+    b += 1;
+    int c = a++;
+    int d = --b;
+    return (a == 2 && b == 1 && c == 1 && d == 1); // returns 1
+}
+```
