@@ -9,5 +9,5 @@ Supports:
 - Unary operators (!, ~, -)
 - Binary arithmetic and logical operators (+, -, \*, /, %, <<, >>, &, |)
 - Logical and relational operators (&&, ||, <, >, <=, >=, !=, ==)
-- ~~Local variables~~
-- ~~Conditions~~
+- Local variables (int)
+- ~~If Statements~~

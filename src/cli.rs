@@ -2,6 +2,7 @@ use crate::backend::codegen;
 use crate::frontend::ir;
 use crate::frontend::lex;
 use crate::frontend::parser;
+use crate::frontend::semantic;
 use anyhow::Result;
 use anyhow::bail;
 use clap::Parser;
@@ -26,11 +27,15 @@ struct Cli {
     #[arg(short, long)]
     parse: bool,
 
-    /// Run lexer, parser and ir, stop afterwards
+    /// Run lexer, parser and semantic analyzer, stop afterwards
+    #[arg(short, long)]
+    validate: bool,
+
+    /// Run lexer, parser, semantic analyzer and ir, stop afterwards
     #[arg(short, long)]
     tacky: bool,
 
-    /// Run lexer, parser, ir and codegen, stop afterwards
+    /// Run lexer, parser, semantic analyzer, ir and codegen, stop afterwards
     #[arg(short, long)]
     codegen: bool,
 }
@@ -80,7 +85,15 @@ pub fn cli() -> Result<()> {
         return Ok(());
     }
 
-    let ir = ir::lift_to_ir(ast)?;
+    let analyzed_ast = semantic::resolve_ast(ast)?;
+
+    if args.validate {
+        println!("Analyzed Ast:");
+        println!("{:?}", analyzed_ast);
+        return Ok(());
+    }
+
+    let ir = ir::lift_to_ir(analyzed_ast)?;
 
     if args.tacky {
         println!("{}", ir);
