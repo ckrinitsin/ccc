@@ -1,7 +1,6 @@
 use crate::frontend::lex::{self, Token};
 use anyhow::{Result, bail};
 use std::collections::VecDeque;
-use std::fmt;
 
 #[derive(Debug, PartialEq)]
 pub enum Ast {
@@ -10,19 +9,34 @@ pub enum Ast {
 
 #[derive(Debug, PartialEq)]
 pub enum Function {
-    Function(String, Statement),
+    Function(String, Vec<BlockItem>),
+}
+
+#[derive(Debug, PartialEq)]
+pub enum BlockItem {
+    S(Statement),
+    D(Declaration),
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Declaration {
+    Declaration(String, Option<Expression>),
 }
 
 #[derive(Debug, PartialEq)]
 pub enum Statement {
     Return(Expression),
+    Expression(Expression),
+    Null,
 }
 
 #[derive(Debug, PartialEq)]
 pub enum Expression {
     Constant(i64),
+    Variable(String),
     Unary(UnaryOp, Box<Expression>),
     Binary(BinaryOp, Box<Expression>, Box<Expression>),
+    Assignment(Box<Expression>, Box<Expression>),
 }
 
 #[derive(Debug, PartialEq)]
@@ -52,75 +66,7 @@ pub enum BinaryOp {
     Greater,
     LessEq,
     GreaterEq,
-}
-
-impl fmt::Display for Ast {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Ast::Program(x) => write!(f, "Program:\n{}", x),
-        }
-    }
-}
-
-impl fmt::Display for Function {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Function::Function(name, body) => write!(f, "Function '{}':\n{}", name, body),
-        }
-    }
-}
-
-impl fmt::Display for Statement {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Statement::Return(x) => write!(f, "Return: {}", x),
-        }
-    }
-}
-
-impl fmt::Display for Expression {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Expression::Constant(c) => write!(f, "{}", c),
-            Expression::Unary(op, expr) => write!(f, "{}{}", op, *expr),
-            Expression::Binary(op, left, right) => write!(f, "{}{}{}", *left, op, *right),
-        }
-    }
-}
-
-impl fmt::Display for UnaryOp {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            UnaryOp::Complement => write!(f, "~"),
-            UnaryOp::Negation => write!(f, "-"),
-            UnaryOp::Not => write!(f, "!"),
-        }
-    }
-}
-
-impl fmt::Display for BinaryOp {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            BinaryOp::Addition => write!(f, "+"),
-            BinaryOp::Subtraction => write!(f, "-"),
-            BinaryOp::Multiplication => write!(f, "*"),
-            BinaryOp::Division => write!(f, "/"),
-            BinaryOp::Modulo => write!(f, "%"),
-            BinaryOp::And => write!(f, "&"),
-            BinaryOp::Or => write!(f, "|"),
-            BinaryOp::Xor => write!(f, "^"),
-            BinaryOp::LShift => write!(f, "<<"),
-            BinaryOp::RShift => write!(f, ">>"),
-            BinaryOp::LAnd => write!(f, "&&"),
-            BinaryOp::LOr => write!(f, "||"),
-            BinaryOp::Equal => write!(f, "=="),
-            BinaryOp::NEqual => write!(f, "!="),
-            BinaryOp::Less => write!(f, "<"),
-            BinaryOp::Greater => write!(f, ">"),
-            BinaryOp::LessEq => write!(f, "<="),
-            BinaryOp::GreaterEq => write!(f, ">="),
-        }
-    }
+    Assignment,
 }
 
 fn expect_token(expect: Token, actual: Option<Token>) -> Result<()> {
@@ -181,6 +127,7 @@ fn parse_binop(tokens: &mut VecDeque<Token>) -> Result<BinaryOp> {
         Some(Token::LessEq) => Ok(BinaryOp::LessEq),
         Some(Token::Greater) => Ok(BinaryOp::Greater),
         Some(Token::GreaterEq) => Ok(BinaryOp::GreaterEq),
+        Some(Token::Assignment) => Ok(BinaryOp::Assignment),
         Some(x) => bail!("Expected an identifier but found {}", x),
         None => bail!("Expected an identifier but file ended"),
     }
@@ -203,6 +150,10 @@ fn parse_factor(tokens: &mut VecDeque<Token>) -> Result<Expression> {
             expect_token(Token::CloseParanthesis, tokens.pop_front())?;
             Ok(expr)
         }
+        Token::Identifier(_) => {
+            let id = parse_identifier(tokens)?;
+            Ok(Expression::Variable(id))
+        }
         x => bail!("Broken expression: got {}", x),
     }
 }
@@ -211,30 +162,74 @@ fn parse_expression(tokens: &mut VecDeque<Token>, order: usize) -> Result<Expres
     let mut left = parse_factor(tokens)?;
     while lex::is_binary(&tokens[0]) && lex::precedence(&tokens[0]) >= order {
         let prec = lex::precedence(&tokens[0]);
-        let op = parse_binop(tokens)?;
-        let right = parse_expression(tokens, prec + 1)?;
-        left = Expression::Binary(op, Box::new(left), Box::new(right));
+        if Token::Assignment == tokens[0] {
+            expect_token(Token::Assignment, tokens.pop_front())?;
+            let right = parse_expression(tokens, prec)?;
+            left = Expression::Assignment(Box::new(left), Box::new(right));
+        } else {
+            let op = parse_binop(tokens)?;
+            let right = parse_expression(tokens, prec + 1)?;
+            left = Expression::Binary(op, Box::new(left), Box::new(right));
+        }
     }
     Ok(left)
 }
 
 fn parse_statement(tokens: &mut VecDeque<Token>) -> Result<Statement> {
-    expect_token(Token::Return, tokens.pop_front())?;
-    let expression = parse_expression(tokens, 0)?;
-    expect_token(Token::Semicolon, tokens.pop_front())?;
-    Ok(Statement::Return(expression))
+    match &tokens[0] {
+        Token::Return => {
+            expect_token(Token::Return, tokens.pop_front())?;
+            let expression = parse_expression(tokens, 0)?;
+            expect_token(Token::Semicolon, tokens.pop_front())?;
+            Ok(Statement::Return(expression))
+        }
+        Token::Semicolon => {
+            expect_token(Token::Semicolon, tokens.pop_front())?;
+            Ok(Statement::Null)
+        }
+        _ => {
+            let expression = parse_expression(tokens, 0)?;
+            expect_token(Token::Semicolon, tokens.pop_front())?;
+            Ok(Statement::Expression(expression))
+        }
+    }
+}
+
+fn parse_declaration(tokens: &mut VecDeque<Token>) -> Result<Declaration> {
+    expect_token(Token::Int, tokens.pop_front())?;
+    let id = parse_identifier(tokens)?;
+    match tokens.pop_front() {
+        Some(Token::Assignment) => {
+            let expression = parse_expression(tokens, 0)?;
+            expect_token(Token::Semicolon, tokens.pop_front())?;
+            Ok(Declaration::Declaration(id, Some(expression)))
+        }
+        Some(Token::Semicolon) => Ok(Declaration::Declaration(id, None)),
+        Some(x) => bail!("Broken declaration: got {}", x),
+        None => bail!("Broken declaration: end of file"),
+    }
+}
+
+fn parse_block_item(tokens: &mut VecDeque<Token>) -> Result<BlockItem> {
+    match &tokens[0] {
+        Token::Int => Ok(BlockItem::D(parse_declaration(tokens)?)),
+        _ => Ok(BlockItem::S(parse_statement(tokens)?)),
+    }
 }
 
 fn parse_function(tokens: &mut VecDeque<Token>) -> Result<Function> {
     expect_token(Token::Int, tokens.pop_front())?;
     let id = parse_identifier(tokens)?;
-    expect_token(Token::OpenBrace, tokens.pop_front())?;
-    expect_token(Token::Void, tokens.pop_front())?;
-    expect_token(Token::CloseBrace, tokens.pop_front())?;
     expect_token(Token::OpenParanthesis, tokens.pop_front())?;
-    let statement = parse_statement(tokens)?;
+    expect_token(Token::Void, tokens.pop_front())?;
     expect_token(Token::CloseParanthesis, tokens.pop_front())?;
-    Ok(Function::Function(id, statement))
+    expect_token(Token::OpenBrace, tokens.pop_front())?;
+    let mut body = Vec::new();
+    while tokens[0] != Token::CloseBrace {
+        body.push(parse_block_item(tokens)?);
+    }
+    expect_token(Token::CloseBrace, tokens.pop_front())?;
+    Ok(Function::Function(id, body))
 }
 
 pub fn parse_tokens(mut tokens: VecDeque<Token>) -> Result<Ast> {

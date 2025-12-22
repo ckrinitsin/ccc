@@ -185,7 +185,7 @@ fn parse_binary_op(expr: parser::BinaryOp) -> Result<BinOp> {
         parser::BinaryOp::Greater => Ok(BinOp::Greater),
         parser::BinaryOp::LessEq => Ok(BinOp::LessEq),
         parser::BinaryOp::GreaterEq => Ok(BinOp::GreaterEq),
-        x => bail!("{} should be handled seperately", x),
+        x => bail!("{:?} should be handled seperately", x),
     }
 }
 
@@ -248,24 +248,64 @@ fn parse_expression(
 
             Ok(dst)
         }
-    }
-}
-
-fn parse_statement(statement: parser::Statement) -> Result<Vec<Instruction>> {
-    let mut instructions = Vec::new();
-    match statement {
-        parser::Statement::Return(expression) => {
-            let dst = parse_expression(expression, &mut instructions)?;
-            instructions.push(Instruction::Ret(dst));
-            Ok(instructions)
+        parser::Expression::Variable(v) => Ok(Operand::Variable(v)),
+        parser::Expression::Assignment(var, right) => {
+            if let parser::Expression::Variable(v) = *var {
+                let src = parse_expression(*right, instructions)?;
+                instructions.push(Instruction::Copy(src, Operand::Variable(v.clone())));
+                Ok(Operand::Variable(v))
+            } else {
+                bail!("Lvalue of Assignment must be a variable!");
+            }
         }
     }
 }
 
+fn parse_statement(
+    statement: parser::Statement,
+    instructions: &mut Vec<Instruction>,
+) -> Result<()> {
+    match statement {
+        parser::Statement::Return(expression) => {
+            let dst = parse_expression(expression, instructions)?;
+            instructions.push(Instruction::Ret(dst));
+            Ok(())
+        }
+        parser::Statement::Expression(expression) => {
+            parse_expression(expression, instructions)?;
+            Ok(())
+        }
+        parser::Statement::Null => Ok(()),
+    }
+}
+
+fn parse_declaration(decl: parser::Declaration, instructions: &mut Vec<Instruction>) -> Result<()> {
+    match decl {
+        parser::Declaration::Declaration(_, None) => Ok(()),
+        parser::Declaration::Declaration(id, Some(expression)) => {
+            let src = parse_expression(expression, instructions)?;
+            instructions.push(Instruction::Copy(src, Operand::Variable(id)));
+            Ok(())
+        }
+    }
+}
+
+fn parse_block_item(bl: parser::BlockItem, instructions: &mut Vec<Instruction>) -> Result<()> {
+    match bl {
+        parser::BlockItem::S(statement) => parse_statement(statement, instructions),
+        parser::BlockItem::D(declaration) => parse_declaration(declaration, instructions),
+    }
+}
+
 fn parse_function(fun: parser::Function) -> Result<Function> {
+    let mut instructions = Vec::new();
     match fun {
         parser::Function::Function(name, body) => {
-            Ok(Function::Function(name, parse_statement(body)?))
+            for block in body {
+                parse_block_item(block, &mut instructions)?;
+            }
+            instructions.push(Instruction::Ret(Operand::Constant(0)));
+            Ok(Function::Function(name, instructions))
         }
     }
 }

@@ -65,14 +65,18 @@ pub fn cli() -> Result<()> {
     let tokens = lex::lex(content)?;
 
     if args.lex {
-        println!("{:?}", tokens);
+        println!("Tokens:");
+        for tok in tokens {
+            print!("{} ", tok);
+        }
         return Ok(());
     }
 
     let ast = parser::parse_tokens(tokens)?;
 
     if args.parse {
-        println!("{}", ast);
+        println!("Ast:");
+        println!("{:?}", ast);
         return Ok(());
     }
 

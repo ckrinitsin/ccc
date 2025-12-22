@@ -5,13 +5,18 @@ use ccc::frontend::parser;
 fn simple_ast_to_ir() {
     let input = parser::Ast::Program(parser::Function::Function(
         "main".to_string(),
-        parser::Statement::Return(parser::Expression::Constant(2)),
+        vec![parser::BlockItem::S(parser::Statement::Return(
+            parser::Expression::Constant(2),
+        ))],
     ));
 
     let result = lift_to_ir(input).unwrap();
     let expected = TAC::Program(Function::Function(
         "main".to_string(),
-        vec![Instruction::Ret(Operand::Constant(2))],
+        vec![
+            Instruction::Ret(Operand::Constant(2)),
+            Instruction::Ret(Operand::Constant(0)),
+        ],
     ));
 
     assert_eq!(result, expected);
@@ -21,10 +26,12 @@ fn simple_ast_to_ir() {
 fn unop_to_ir() {
     let input = parser::Ast::Program(parser::Function::Function(
         "main".to_string(),
-        parser::Statement::Return(parser::Expression::Unary(
-            parser::UnaryOp::Complement,
-            Box::new(parser::Expression::Constant(2)),
-        )),
+        vec![parser::BlockItem::S(parser::Statement::Return(
+            parser::Expression::Unary(
+                parser::UnaryOp::Complement,
+                Box::new(parser::Expression::Constant(2)),
+            ),
+        ))],
     ));
 
     let result = lift_to_ir(input).unwrap();
@@ -37,6 +44,7 @@ fn unop_to_ir() {
                 Operand::Variable("tmp.0".to_string()),
             ),
             Instruction::Ret(Operand::Variable("tmp.0".to_string())),
+            Instruction::Ret(Operand::Constant(0)),
         ],
     ));
 
@@ -47,16 +55,18 @@ fn unop_to_ir() {
 fn recursive_unop_to_ir() {
     let input = parser::Ast::Program(parser::Function::Function(
         "main".to_string(),
-        parser::Statement::Return(parser::Expression::Unary(
-            parser::UnaryOp::Negation,
-            Box::new(parser::Expression::Unary(
-                parser::UnaryOp::Complement,
+        vec![parser::BlockItem::S(parser::Statement::Return(
+            parser::Expression::Unary(
+                parser::UnaryOp::Negation,
                 Box::new(parser::Expression::Unary(
-                    parser::UnaryOp::Negation,
-                    Box::new(parser::Expression::Constant(2)),
+                    parser::UnaryOp::Complement,
+                    Box::new(parser::Expression::Unary(
+                        parser::UnaryOp::Negation,
+                        Box::new(parser::Expression::Constant(2)),
+                    )),
                 )),
-            )),
-        )),
+            ),
+        ))],
     ));
 
     let result = lift_to_ir(input).unwrap();
@@ -79,6 +89,7 @@ fn recursive_unop_to_ir() {
                 Operand::Variable("tmp.2".to_string()),
             ),
             Instruction::Ret(Operand::Variable("tmp.2".to_string())),
+            Instruction::Ret(Operand::Constant(0)),
         ],
     ));
 

@@ -36,6 +36,7 @@ pub enum Token {
     Greater,
     LessEq,
     GreaterEq,
+    Assignment,
 }
 
 impl Token {
@@ -55,6 +56,7 @@ impl Token {
             (Regex::new(r"\!").unwrap(), |_| Token::Not),
             (Regex::new(r"\-\-").unwrap(), |_| Token::Decrement),
             (Regex::new(r"\-").unwrap(), |_| Token::Negation),
+            (Regex::new(r"\=").unwrap(), |_| Token::Assignment),
             (Regex::new(r"\+").unwrap(), |_| Token::Addition),
             (Regex::new(r"\^").unwrap(), |_| Token::Xor),
             (Regex::new(r"\|").unwrap(), |_| Token::Or),
@@ -95,6 +97,7 @@ impl fmt::Display for Token {
             Token::Semicolon => write!(f, ";"),
             Token::Decrement => write!(f, "--"),
             Token::Negation => write!(f, "-"),
+            Token::Assignment => write!(f, "="),
             Token::Complement => write!(f, "~"),
             Token::Addition => write!(f, "+"),
             Token::Multiplication => write!(f, "*"),
@@ -126,6 +129,7 @@ pub fn is_binary(token: &Token) -> bool {
         | Token::Division
         | Token::Modulo
         | Token::And
+        | Token::Assignment
         | Token::Or
         | Token::Xor
         | Token::LShift
@@ -161,6 +165,7 @@ pub fn precedence(token: &Token) -> usize {
         Token::Or => 15,
         Token::LAnd => 10,
         Token::LOr => 5,
+        Token::Assignment => 2,
         _ => 0,
     }
 }
