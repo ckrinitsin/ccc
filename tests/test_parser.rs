@@ -7,14 +7,14 @@ fn valid1() {
     let input = VecDeque::from([
         Token::Int,
         Token::Identifier("main".to_string()),
-        Token::OpenBrace,
-        Token::Void,
-        Token::CloseBrace,
         Token::OpenParanthesis,
+        Token::Void,
+        Token::CloseParanthesis,
+        Token::OpenBrace,
         Token::Return,
         Token::Constant(2),
         Token::Semicolon,
-        Token::CloseParanthesis,
+        Token::CloseBrace,
     ]);
 
     let result = parse_tokens(input).unwrap();
@@ -31,13 +31,13 @@ fn invalid1() {
     let input = VecDeque::from([
         Token::Int,
         Token::Identifier("main".to_string()),
-        Token::OpenBrace,
-        Token::Void,
-        Token::CloseBrace,
         Token::OpenParanthesis,
+        Token::Void,
+        Token::CloseParanthesis,
+        Token::OpenBrace,
         Token::Return,
         Token::Constant(2),
-        Token::CloseParanthesis,
+        Token::CloseBrace,
     ]);
 
     let result = parse_tokens(input);
@@ -50,10 +50,10 @@ fn binary_simple() {
     let input = VecDeque::from([
         Token::Int,
         Token::Identifier("main".to_string()),
-        Token::OpenBrace,
-        Token::Void,
-        Token::CloseBrace,
         Token::OpenParanthesis,
+        Token::Void,
+        Token::CloseParanthesis,
+        Token::OpenBrace,
         Token::Return,
         Token::Constant(2),
         Token::Addition,
@@ -61,7 +61,7 @@ fn binary_simple() {
         Token::Negation,
         Token::Constant(4),
         Token::Semicolon,
-        Token::CloseParanthesis,
+        Token::CloseBrace,
     ]);
 
     let result = parse_tokens(input).unwrap();
@@ -86,10 +86,10 @@ fn binary_precedence() {
     let input = VecDeque::from([
         Token::Int,
         Token::Identifier("main".to_string()),
-        Token::OpenBrace,
-        Token::Void,
-        Token::CloseBrace,
         Token::OpenParanthesis,
+        Token::Void,
+        Token::CloseParanthesis,
+        Token::OpenBrace,
         Token::Return,
         Token::Constant(2),
         Token::Multiplication,
@@ -97,7 +97,7 @@ fn binary_precedence() {
         Token::Negation,
         Token::Constant(4),
         Token::Semicolon,
-        Token::CloseParanthesis,
+        Token::CloseBrace,
     ]);
 
     let result = parse_tokens(input).unwrap();
@@ -122,10 +122,10 @@ fn binary_precedence_switch() {
     let input = VecDeque::from([
         Token::Int,
         Token::Identifier("main".to_string()),
-        Token::OpenBrace,
-        Token::Void,
-        Token::CloseBrace,
         Token::OpenParanthesis,
+        Token::Void,
+        Token::CloseParanthesis,
+        Token::OpenBrace,
         Token::Return,
         Token::Constant(3),
         Token::Addition,
@@ -133,7 +133,7 @@ fn binary_precedence_switch() {
         Token::Multiplication,
         Token::Constant(8),
         Token::Semicolon,
-        Token::CloseParanthesis,
+        Token::CloseBrace,
     ]);
 
     let result = parse_tokens(input).unwrap();
@@ -158,20 +158,20 @@ fn braces_over_precedence() {
     let input = VecDeque::from([
         Token::Int,
         Token::Identifier("main".to_string()),
-        Token::OpenBrace,
-        Token::Void,
-        Token::CloseBrace,
         Token::OpenParanthesis,
-        Token::Return,
+        Token::Void,
+        Token::CloseParanthesis,
         Token::OpenBrace,
+        Token::Return,
+        Token::OpenParanthesis,
         Token::Constant(3),
         Token::Addition,
         Token::Constant(4),
-        Token::CloseBrace,
+        Token::CloseParanthesis,
         Token::Multiplication,
         Token::Constant(8),
         Token::Semicolon,
-        Token::CloseParanthesis,
+        Token::CloseBrace,
     ]);
 
     let result = parse_tokens(input).unwrap();
@@ -196,20 +196,20 @@ fn invalid_braces() {
     let input = VecDeque::from([
         Token::Int,
         Token::Identifier("main".to_string()),
-        Token::OpenBrace,
-        Token::Void,
-        Token::CloseBrace,
         Token::OpenParanthesis,
-        Token::Return,
+        Token::Void,
+        Token::CloseParanthesis,
         Token::OpenBrace,
+        Token::Return,
+        Token::OpenParanthesis,
         Token::Constant(3),
         Token::Addition,
-        Token::CloseBrace,
+        Token::CloseParanthesis,
         Token::Constant(4),
         Token::Multiplication,
         Token::Constant(8),
         Token::Semicolon,
-        Token::CloseParanthesis,
+        Token::CloseBrace,
     ]);
 
     let result = parse_tokens(input);
@@ -222,13 +222,13 @@ fn invalid2() {
     let input = VecDeque::from([
         Token::Int,
         Token::Identifier("main".to_string()),
-        Token::OpenBrace,
-        Token::Void,
-        Token::CloseBrace,
         Token::OpenParanthesis,
+        Token::Void,
+        Token::CloseParanthesis,
+        Token::OpenBrace,
         Token::Return,
         Token::Constant(2),
-        Token::CloseParanthesis,
+        Token::CloseBrace,
         Token::Identifier("foo".to_string()),
     ]);
 

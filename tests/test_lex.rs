@@ -12,14 +12,14 @@ fn valid1() {
     let expected = vec![
         Token::Int,
         Token::Identifier("main".to_string()),
-        Token::OpenBrace,
-        Token::Void,
-        Token::CloseBrace,
         Token::OpenParanthesis,
+        Token::Void,
+        Token::CloseParanthesis,
+        Token::OpenBrace,
         Token::Return,
         Token::Constant(2),
         Token::Semicolon,
-        Token::CloseParanthesis,
+        Token::CloseBrace,
     ];
 
     assert_eq!(result, expected);
@@ -37,12 +37,12 @@ fn valid2() {
     let expected = vec![
         Token::Int,
         Token::Identifier("main".to_string()),
-        Token::OpenBrace,
-        Token::Void,
-        Token::CloseBrace,
         Token::OpenParanthesis,
-        Token::Return,
+        Token::Void,
         Token::CloseParanthesis,
+        Token::OpenBrace,
+        Token::Return,
+        Token::CloseBrace,
     ];
 
     assert_eq!(result, expected);

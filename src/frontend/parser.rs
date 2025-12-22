@@ -197,10 +197,10 @@ fn parse_factor(tokens: &mut VecDeque<Token>) -> Result<Expression> {
             let expr = parse_factor(tokens)?;
             Ok(Expression::Unary(unop, Box::new(expr)))
         }
-        Token::OpenBrace => {
-            expect_token(Token::OpenBrace, tokens.pop_front())?;
+        Token::OpenParanthesis => {
+            expect_token(Token::OpenParanthesis, tokens.pop_front())?;
             let expr = parse_expression(tokens, 0)?;
-            expect_token(Token::CloseBrace, tokens.pop_front())?;
+            expect_token(Token::CloseParanthesis, tokens.pop_front())?;
             Ok(expr)
         }
         x => bail!("Broken expression: got {}", x),
