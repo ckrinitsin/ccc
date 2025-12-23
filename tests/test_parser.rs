@@ -20,7 +20,9 @@ fn valid1() {
     let result = parse_tokens(input).unwrap();
     let expected = Ast::Program(Function::Function(
         "main".to_string(),
-        vec![BlockItem::S(Statement::Return(Expression::Constant(2)))],
+        Block::B(vec![BlockItem::S(Statement::Return(Expression::Constant(
+            2,
+        )))]),
     ));
 
     assert_eq!(result, expected);
@@ -67,7 +69,7 @@ fn binary_simple() {
     let result = parse_tokens(input).unwrap();
     let expected = Ast::Program(Function::Function(
         "main".to_string(),
-        vec![BlockItem::S(Statement::Return(Expression::Binary(
+        Block::B(vec![BlockItem::S(Statement::Return(Expression::Binary(
             BinaryOp::Subtraction,
             Box::new(Expression::Binary(
                 BinaryOp::Addition,
@@ -75,7 +77,7 @@ fn binary_simple() {
                 Box::new(Expression::Constant(3)),
             )),
             Box::new(Expression::Constant(4)),
-        )))],
+        )))]),
     ));
 
     assert_eq!(result, expected);
@@ -103,7 +105,7 @@ fn binary_precedence() {
     let result = parse_tokens(input).unwrap();
     let expected = Ast::Program(Function::Function(
         "main".to_string(),
-        vec![BlockItem::S(Statement::Return(Expression::Binary(
+        Block::B(vec![BlockItem::S(Statement::Return(Expression::Binary(
             BinaryOp::Subtraction,
             Box::new(Expression::Binary(
                 BinaryOp::Multiplication,
@@ -111,7 +113,7 @@ fn binary_precedence() {
                 Box::new(Expression::Constant(3)),
             )),
             Box::new(Expression::Constant(4)),
-        )))],
+        )))]),
     ));
 
     assert_eq!(result, expected);
@@ -139,7 +141,7 @@ fn binary_precedence_switch() {
     let result = parse_tokens(input).unwrap();
     let expected = Ast::Program(Function::Function(
         "main".to_string(),
-        vec![BlockItem::S(Statement::Return(Expression::Binary(
+        Block::B(vec![BlockItem::S(Statement::Return(Expression::Binary(
             BinaryOp::Addition,
             Box::new(Expression::Constant(3)),
             Box::new(Expression::Binary(
@@ -147,7 +149,7 @@ fn binary_precedence_switch() {
                 Box::new(Expression::Constant(4)),
                 Box::new(Expression::Constant(8)),
             )),
-        )))],
+        )))]),
     ));
 
     assert_eq!(result, expected);
@@ -177,7 +179,7 @@ fn braces_over_precedence() {
     let result = parse_tokens(input).unwrap();
     let expected = Ast::Program(Function::Function(
         "main".to_string(),
-        vec![BlockItem::S(Statement::Return(Expression::Binary(
+        Block::B(vec![BlockItem::S(Statement::Return(Expression::Binary(
             BinaryOp::Multiplication,
             Box::new(Expression::Binary(
                 BinaryOp::Addition,
@@ -185,7 +187,7 @@ fn braces_over_precedence() {
                 Box::new(Expression::Constant(4)),
             )),
             Box::new(Expression::Constant(8)),
-        )))],
+        )))]),
     ));
 
     assert_eq!(result, expected);

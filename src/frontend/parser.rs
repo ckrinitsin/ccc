@@ -9,7 +9,12 @@ pub enum Ast {
 
 #[derive(Debug, PartialEq)]
 pub enum Function {
-    Function(String, Vec<BlockItem>),
+    Function(String, Block),
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Block {
+    B(Vec<BlockItem>),
 }
 
 #[derive(Debug, PartialEq)]
@@ -28,6 +33,7 @@ pub enum Statement {
     Return(Expression),
     Expression(Expression),
     If(Expression, Box<Statement>, Option<Box<Statement>>),
+    Compound(Block),
     Labeled(String, Box<Statement>),
     Goto(String),
     Null,
@@ -270,7 +276,8 @@ fn parse_expression(tokens: &mut VecDeque<Token>, order: usize) -> Result<Expres
 /* statement ::= "return" <expression> ";" | ";" | <expression> ";"
  *  | "if" "(" <expression> ")" <statement> [ "else" <statement> ]
  *  | <identifier> ":" <statement>
- *  | "goto" <identifier> ";" */
+ *  | "goto" <identifier> ";"
+ *  | <block> */
 fn parse_statement(tokens: &mut VecDeque<Token>) -> Result<Statement> {
     match (&tokens[0], &tokens[1]) {
         (Token::Return, _) => {
@@ -308,6 +315,10 @@ fn parse_statement(tokens: &mut VecDeque<Token>) -> Result<Statement> {
             expect_token(Token::Semicolon, tokens.pop_front())?;
             Ok(label)
         }
+        (Token::OpenBrace, _) => {
+            let block = parse_block(tokens)?;
+            Ok(Statement::Compound(block))
+        }
         _ => {
             let expression = parse_expression(tokens, 0)?;
             expect_token(Token::Semicolon, tokens.pop_front())?;
@@ -340,20 +351,26 @@ fn parse_block_item(tokens: &mut VecDeque<Token>) -> Result<BlockItem> {
     }
 }
 
-/* function ::= "int" <identifier> "(" "void" ")" "{" { <block-item> } "}" */
-fn parse_function(tokens: &mut VecDeque<Token>) -> Result<Function> {
-    expect_token(Token::Int, tokens.pop_front())?;
-    let id = parse_identifier(tokens)?;
-    expect_token(Token::OpenParanthesis, tokens.pop_front())?;
-    expect_token(Token::Void, tokens.pop_front())?;
-    expect_token(Token::CloseParanthesis, tokens.pop_front())?;
+/* block ::= "{" { <block-item> }  "}" */
+fn parse_block(tokens: &mut VecDeque<Token>) -> Result<Block> {
     expect_token(Token::OpenBrace, tokens.pop_front())?;
     let mut body = Vec::new();
     while tokens[0] != Token::CloseBrace {
         body.push(parse_block_item(tokens)?);
     }
     expect_token(Token::CloseBrace, tokens.pop_front())?;
-    Ok(Function::Function(id, body))
+    Ok(Block::B(body))
+}
+
+/* function ::= "int" <identifier> "(" "void" ")" <block> */
+fn parse_function(tokens: &mut VecDeque<Token>) -> Result<Function> {
+    expect_token(Token::Int, tokens.pop_front())?;
+    let id = parse_identifier(tokens)?;
+    expect_token(Token::OpenParanthesis, tokens.pop_front())?;
+    expect_token(Token::Void, tokens.pop_front())?;
+    expect_token(Token::CloseParanthesis, tokens.pop_front())?;
+    let block = parse_block(tokens)?;
+    Ok(Function::Function(id, block))
 }
 
 /* program ::= <function> */

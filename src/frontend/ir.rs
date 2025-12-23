@@ -366,6 +366,7 @@ fn parse_statement(
             instructions.push(Instruction::Jump(label));
             Ok(())
         }
+        parser::Statement::Compound(block) => parse_block(block, instructions),
     }
 }
 
@@ -387,13 +388,22 @@ fn parse_block_item(bl: parser::BlockItem, instructions: &mut Vec<Instruction>) 
     }
 }
 
+fn parse_block(bl: parser::Block, instructions: &mut Vec<Instruction>) -> Result<()> {
+    match bl {
+        parser::Block::B(block_items) => {
+            for block in block_items {
+                parse_block_item(block, instructions)?;
+            }
+            Ok(())
+        }
+    }
+}
+
 fn parse_function(fun: parser::Function) -> Result<Function> {
     let mut instructions = Vec::new();
     match fun {
         parser::Function::Function(name, body) => {
-            for block in body {
-                parse_block_item(block, &mut instructions)?;
-            }
+            parse_block(body, &mut instructions)?;
             instructions.push(Instruction::Ret(Operand::Constant(0)));
             Ok(Function::Function(name, instructions))
         }

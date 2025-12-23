@@ -12,7 +12,8 @@ Supports:
 - Local variables (int)
 - Compound assignments and post/pre (inc/dec)rement (+=, /=, <<, ... and ++\<var\>, \<var\>-- ...) 
 - If Statements (and goto + labeled statements)
-- ~~Compound Statements~~
+- Compound Statements
+- ~~Loops~~
 
 Here is an example of now compilable c code:
 ```

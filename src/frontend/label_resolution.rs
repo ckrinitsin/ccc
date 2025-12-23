@@ -3,7 +3,7 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use crate::frontend::parser::{Ast, BlockItem, Function, Statement};
+use crate::frontend::parser::{Ast, Block, BlockItem, Function, Statement};
 use anyhow::{Result, bail};
 
 fn gen_label(id: String) -> String {
@@ -41,6 +41,7 @@ fn resolve_goto_statement(
             x,
             Box::new(resolve_goto_statement(*statement, hash_map)?),
         )),
+        Statement::Compound(block) => Ok(Statement::Compound(resolve_goto_block(block, hash_map)?)),
         c => Ok(c),
     }
 }
@@ -76,36 +77,56 @@ fn resolve_label_statement(
                 None,
             ))
         }
+        Statement::Compound(block) => {
+            Ok(Statement::Compound(resolve_label_block(block, hash_map)?))
+        }
         c => Ok(c),
+    }
+}
+
+fn resolve_goto_block(block: Block, hash_map: &mut HashMap<String, String>) -> Result<Block> {
+    match block {
+        Block::B(block_items) => {
+            let mut result = Vec::new();
+            for item in block_items {
+                let new_item = match item {
+                    BlockItem::S(statement) => {
+                        BlockItem::S(resolve_goto_statement(statement, hash_map)?)
+                    }
+                    c => c,
+                };
+                result.push(new_item);
+            }
+            Ok(Block::B(result))
+        }
+    }
+}
+
+fn resolve_label_block(block: Block, hash_map: &mut HashMap<String, String>) -> Result<Block> {
+    match block {
+        Block::B(block_items) => {
+            let mut result = Vec::new();
+            for item in block_items {
+                let new_item = match item {
+                    BlockItem::S(statement) => {
+                        BlockItem::S(resolve_label_statement(statement, hash_map)?)
+                    }
+                    c => c,
+                };
+                result.push(new_item);
+            }
+            Ok(Block::B(result))
+        }
     }
 }
 
 fn resolve_label_function(func: Function) -> Result<Function> {
     let mut hash_map: HashMap<String, String> = HashMap::new();
     match func {
-        Function::Function(x, block_items) => {
-            let mut labeled_items = Vec::new();
-            for item in block_items {
-                let new_item = match item {
-                    BlockItem::S(statement) => {
-                        BlockItem::S(resolve_label_statement(statement, &mut hash_map)?)
-                    }
-                    c => c,
-                };
-                labeled_items.push(new_item);
-            }
-
-            let mut result = Vec::new();
-            for item in labeled_items {
-                let new_item = match item {
-                    BlockItem::S(statement) => {
-                        BlockItem::S(resolve_goto_statement(statement, &mut hash_map)?)
-                    }
-                    c => c,
-                };
-                result.push(new_item);
-            }
-            Ok(Function::Function(x, result))
+        Function::Function(x, block) => {
+            let block = resolve_label_block(block, &mut hash_map)?;
+            let block = resolve_goto_block(block, &mut hash_map)?;
+            Ok(Function::Function(x, block))
         }
     }
 }

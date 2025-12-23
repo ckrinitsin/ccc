@@ -5,9 +5,9 @@ use ccc::frontend::parser;
 fn simple_ast_to_ir() {
     let input = parser::Ast::Program(parser::Function::Function(
         "main".to_string(),
-        vec![parser::BlockItem::S(parser::Statement::Return(
+        parser::Block::B(vec![parser::BlockItem::S(parser::Statement::Return(
             parser::Expression::Constant(2),
-        ))],
+        ))]),
     ));
 
     let result = lift_to_ir(input).unwrap();
@@ -26,12 +26,12 @@ fn simple_ast_to_ir() {
 fn unop_to_ir() {
     let input = parser::Ast::Program(parser::Function::Function(
         "main".to_string(),
-        vec![parser::BlockItem::S(parser::Statement::Return(
+        parser::Block::B(vec![parser::BlockItem::S(parser::Statement::Return(
             parser::Expression::Unary(
                 parser::UnaryOp::Complement,
                 Box::new(parser::Expression::Constant(2)),
             ),
-        ))],
+        ))]),
     ));
 
     let result = lift_to_ir(input).unwrap();
@@ -55,7 +55,7 @@ fn unop_to_ir() {
 fn recursive_unop_to_ir() {
     let input = parser::Ast::Program(parser::Function::Function(
         "main".to_string(),
-        vec![parser::BlockItem::S(parser::Statement::Return(
+        parser::Block::B(vec![parser::BlockItem::S(parser::Statement::Return(
             parser::Expression::Unary(
                 parser::UnaryOp::Negation,
                 Box::new(parser::Expression::Unary(
@@ -66,7 +66,7 @@ fn recursive_unop_to_ir() {
                     )),
                 )),
             ),
-        ))],
+        ))]),
     ));
 
     let result = lift_to_ir(input).unwrap();
