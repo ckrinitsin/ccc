@@ -109,6 +109,11 @@ fn resolve_statement(
                 None,
             )),
         },
+        Statement::Labeled(id, statement) => Ok(Statement::Labeled(
+            id,
+            Box::new(resolve_statement(*statement, hash_map)?),
+        )),
+        Statement::Goto(id) => Ok(Statement::Goto(id)),
     }
 }
 
@@ -157,7 +162,7 @@ fn resolve_function(func: Function) -> Result<Function> {
 
 static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
-pub fn resolve_ast(ast: Ast) -> Result<Ast> {
+pub fn variable_resolution(ast: Ast) -> Result<Ast> {
     COUNTER.store(0, Ordering::SeqCst);
     match ast {
         Ast::Program(function) => Ok(Ast::Program(resolve_function(function)?)),

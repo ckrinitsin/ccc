@@ -52,6 +52,7 @@ pub enum Token {
     Else,
     QuestionMark,
     Colon,
+    Goto,
 }
 
 impl Token {
@@ -102,6 +103,7 @@ impl Token {
             (Regex::new(r"int\b").unwrap(), |_| Token::Int),
             (Regex::new(r"if\b").unwrap(), |_| Token::If),
             (Regex::new(r"else\b").unwrap(), |_| Token::Else),
+            (Regex::new(r"goto\b").unwrap(), |_| Token::Goto),
             (Regex::new(r"[0-9]+\b").unwrap(), |s| {
                 Token::Constant(s.parse::<i64>().unwrap())
             }),
@@ -165,6 +167,8 @@ impl fmt::Display for Token {
             Token::Colon => write!(f, ":"),
             Token::If => write!(f, "if"),
             Token::Else => write!(f, "else"),
+
+            Token::Goto => write!(f, "goto"),
         }
     }
 }

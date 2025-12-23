@@ -1,8 +1,9 @@
 use crate::backend::codegen;
 use crate::frontend::ir;
+use crate::frontend::label_resolution;
 use crate::frontend::lex;
 use crate::frontend::parser;
-use crate::frontend::semantic;
+use crate::frontend::variable_resolution;
 use anyhow::Result;
 use anyhow::bail;
 use clap::Parser;
@@ -85,7 +86,8 @@ pub fn cli() -> Result<()> {
         return Ok(());
     }
 
-    let analyzed_ast = semantic::resolve_ast(ast)?;
+    let analyzed_ast = variable_resolution::variable_resolution(ast)?;
+    let analyzed_ast = label_resolution::label_resolution(analyzed_ast)?;
 
     if args.validate {
         println!("Analyzed Ast:");

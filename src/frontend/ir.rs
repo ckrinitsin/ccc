@@ -358,6 +358,14 @@ fn parse_statement(
 
             Ok(())
         }
+        parser::Statement::Labeled(label, statement) => {
+            instructions.push(Instruction::Label(label));
+            parse_statement(*statement, instructions)
+        }
+        parser::Statement::Goto(label) => {
+            instructions.push(Instruction::Jump(label));
+            Ok(())
+        }
     }
 }
 

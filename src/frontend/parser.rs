@@ -28,6 +28,8 @@ pub enum Statement {
     Return(Expression),
     Expression(Expression),
     If(Expression, Box<Statement>, Option<Box<Statement>>),
+    Labeled(String, Box<Statement>),
+    Goto(String),
     Null,
 }
 
@@ -266,20 +268,22 @@ fn parse_expression(tokens: &mut VecDeque<Token>, order: usize) -> Result<Expres
 }
 
 /* statement ::= "return" <expression> ";" | ";" | <expression> ";"
- *  | "if" "(" <expression> ")" <statement> [ "else" <statement> ] */
+ *  | "if" "(" <expression> ")" <statement> [ "else" <statement> ]
+ *  | <identifier> ":" <statement>
+ *  | "goto" <identifier> ";" */
 fn parse_statement(tokens: &mut VecDeque<Token>) -> Result<Statement> {
-    match &tokens[0] {
-        Token::Return => {
+    match (&tokens[0], &tokens[1]) {
+        (Token::Return, _) => {
             expect_token(Token::Return, tokens.pop_front())?;
             let expression = parse_expression(tokens, 0)?;
             expect_token(Token::Semicolon, tokens.pop_front())?;
             Ok(Statement::Return(expression))
         }
-        Token::Semicolon => {
+        (Token::Semicolon, _) => {
             expect_token(Token::Semicolon, tokens.pop_front())?;
             Ok(Statement::Null)
         }
-        Token::If => {
+        (Token::If, _) => {
             expect_token(Token::If, tokens.pop_front())?;
             expect_token(Token::OpenParanthesis, tokens.pop_front())?;
             let condition = parse_expression(tokens, 0)?;
@@ -291,6 +295,18 @@ fn parse_statement(tokens: &mut VecDeque<Token>) -> Result<Statement> {
                 else_statement = Some(Box::new(parse_statement(tokens)?));
             }
             Ok(Statement::If(condition, if_statement, else_statement))
+        }
+        (Token::Identifier(_), Token::Colon) => {
+            let id = parse_identifier(tokens)?;
+            expect_token(Token::Colon, tokens.pop_front())?;
+            let statement = parse_statement(tokens)?;
+            return Ok(Statement::Labeled(id, Box::new(statement)));
+        }
+        (Token::Goto, _) => {
+            expect_token(Token::Goto, tokens.pop_front())?;
+            let label = Statement::Goto(parse_identifier(tokens)?);
+            expect_token(Token::Semicolon, tokens.pop_front())?;
+            Ok(label)
         }
         _ => {
             let expression = parse_expression(tokens, 0)?;
