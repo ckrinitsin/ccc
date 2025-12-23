@@ -307,6 +307,23 @@ fn parse_expression(
             ));
             Ok(dst)
         }
+        parser::Expression::Conditional(left, middle, right) => {
+            let dst = gen_temp();
+            let label_false = gen_label();
+            let end_label = label_false.to_string() + "_end";
+
+            let cond = parse_expression(*left, instructions)?;
+            instructions.push(Instruction::JumpIfZero(cond, label_false.clone()));
+            let middle = parse_expression(*middle, instructions)?;
+            instructions.push(Instruction::Copy(middle, dst.clone()));
+            instructions.push(Instruction::Jump(end_label.clone()));
+            instructions.push(Instruction::Label(label_false));
+            let right = parse_expression(*right, instructions)?;
+            instructions.push(Instruction::Copy(right, dst.clone()));
+            instructions.push(Instruction::Label(end_label));
+
+            Ok(dst)
+        }
     }
 }
 
@@ -325,6 +342,22 @@ fn parse_statement(
             Ok(())
         }
         parser::Statement::Null => Ok(()),
+        parser::Statement::If(condition, if_statement, else_statement) => {
+            let label_else = gen_label();
+            let end_label = label_else.to_string() + "_else";
+
+            let cond = parse_expression(condition, instructions)?;
+            instructions.push(Instruction::JumpIfZero(cond, label_else.clone()));
+            parse_statement(*if_statement, instructions)?;
+            instructions.push(Instruction::Jump(end_label.clone()));
+            instructions.push(Instruction::Label(label_else));
+            if let Some(x) = else_statement {
+                parse_statement(*x, instructions)?;
+            }
+            instructions.push(Instruction::Label(end_label));
+
+            Ok(())
+        }
     }
 }
 

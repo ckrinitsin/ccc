@@ -27,6 +27,7 @@ pub enum Declaration {
 pub enum Statement {
     Return(Expression),
     Expression(Expression),
+    If(Expression, Box<Statement>, Option<Box<Statement>>),
     Null,
 }
 
@@ -40,6 +41,7 @@ pub enum Expression {
     CompoundAssignment(BinaryOp, Box<Expression>, Box<Expression>),
     PostIncr(Box<Expression>),
     PostDecr(Box<Expression>),
+    Conditional(Box<Expression>, Box<Expression>, Box<Expression>),
 }
 
 #[derive(Debug, PartialEq)]
@@ -235,7 +237,8 @@ fn parse_factor(tokens: &mut VecDeque<Token>) -> Result<Expression> {
     }
 }
 
-/* expression ::= <factor> | <expression> <binop> <expression> */
+/* expression ::= <factor> | <expression> <binop> <expression>
+ *  | <expression> "?" <expression> ":" <expression>*/
 fn parse_expression(tokens: &mut VecDeque<Token>, order: usize) -> Result<Expression> {
     let mut left = parse_factor(tokens)?;
     while lex::is_binary(&tokens[0]) && lex::precedence(&tokens[0]) >= order {
@@ -247,6 +250,12 @@ fn parse_expression(tokens: &mut VecDeque<Token>, order: usize) -> Result<Expres
                 None => Expression::Assignment(Box::new(left), Box::new(right)),
                 Some(x) => Expression::CompoundAssignment(x, Box::new(left), Box::new(right)),
             };
+        } else if matches!(tokens[0], Token::QuestionMark) {
+            expect_token(Token::QuestionMark, tokens.pop_front())?;
+            let middle = parse_expression(tokens, 0)?;
+            expect_token(Token::Colon, tokens.pop_front())?;
+            let right = parse_expression(tokens, prec)?;
+            left = Expression::Conditional(Box::new(left), Box::new(middle), Box::new(right));
         } else {
             let op = parse_binop(tokens)?;
             let right = parse_expression(tokens, prec + 1)?;
@@ -256,7 +265,8 @@ fn parse_expression(tokens: &mut VecDeque<Token>, order: usize) -> Result<Expres
     Ok(left)
 }
 
-/* statement ::= "return" <expression> ";" | ";" | <expression> ";" */
+/* statement ::= "return" <expression> ";" | ";" | <expression> ";"
+ *  | "if" "(" <expression> ")" <statement> [ "else" <statement> ] */
 fn parse_statement(tokens: &mut VecDeque<Token>) -> Result<Statement> {
     match &tokens[0] {
         Token::Return => {
@@ -268,6 +278,19 @@ fn parse_statement(tokens: &mut VecDeque<Token>) -> Result<Statement> {
         Token::Semicolon => {
             expect_token(Token::Semicolon, tokens.pop_front())?;
             Ok(Statement::Null)
+        }
+        Token::If => {
+            expect_token(Token::If, tokens.pop_front())?;
+            expect_token(Token::OpenParanthesis, tokens.pop_front())?;
+            let condition = parse_expression(tokens, 0)?;
+            expect_token(Token::CloseParanthesis, tokens.pop_front())?;
+            let if_statement = Box::new(parse_statement(tokens)?);
+            let mut else_statement = None;
+            if matches!(&tokens[0], Token::Else) {
+                expect_token(Token::Else, tokens.pop_front())?;
+                else_statement = Some(Box::new(parse_statement(tokens)?));
+            }
+            Ok(Statement::If(condition, if_statement, else_statement))
         }
         _ => {
             let expression = parse_expression(tokens, 0)?;

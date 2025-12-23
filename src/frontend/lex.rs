@@ -48,12 +48,15 @@ pub enum Token {
     CXor,
     CLShift,
     CRShift,
+    If,
+    Else,
+    QuestionMark,
+    Colon,
 }
 
 impl Token {
     pub fn patterns() -> Vec<(Regex, fn(&str) -> Token)> {
         vec![
-            (Regex::new(r"\;").unwrap(), |_| Token::Semicolon),
             (Regex::new(r"<<\=").unwrap(), |_| Token::CLShift),
             (Regex::new(r">>\=").unwrap(), |_| Token::CRShift),
             (Regex::new(r"\-\=").unwrap(), |_| Token::CNegation),
@@ -75,6 +78,8 @@ impl Token {
             (Regex::new(r"\!").unwrap(), |_| Token::Not),
             (Regex::new(r"\+\+").unwrap(), |_| Token::Increment),
             (Regex::new(r"\-\-").unwrap(), |_| Token::Decrement),
+            (Regex::new(r"\?").unwrap(), |_| Token::QuestionMark),
+            (Regex::new(r"\:").unwrap(), |_| Token::Colon),
             (Regex::new(r"<").unwrap(), |_| Token::Less),
             (Regex::new(r">").unwrap(), |_| Token::Greater),
             (Regex::new(r"\-").unwrap(), |_| Token::Negation),
@@ -91,9 +96,12 @@ impl Token {
             (Regex::new(r"\}").unwrap(), |_| Token::CloseBrace),
             (Regex::new(r"\(").unwrap(), |_| Token::OpenParanthesis),
             (Regex::new(r"\)").unwrap(), |_| Token::CloseParanthesis),
+            (Regex::new(r"\;").unwrap(), |_| Token::Semicolon),
             (Regex::new(r"return\b").unwrap(), |_| Token::Return),
             (Regex::new(r"void\b").unwrap(), |_| Token::Void),
             (Regex::new(r"int\b").unwrap(), |_| Token::Int),
+            (Regex::new(r"if\b").unwrap(), |_| Token::If),
+            (Regex::new(r"else\b").unwrap(), |_| Token::Else),
             (Regex::new(r"[0-9]+\b").unwrap(), |s| {
                 Token::Constant(s.parse::<i64>().unwrap())
             }),
@@ -152,6 +160,11 @@ impl fmt::Display for Token {
             Token::Greater => write!(f, ">"),
             Token::LessEq => write!(f, "<="),
             Token::GreaterEq => write!(f, ">="),
+
+            Token::QuestionMark => write!(f, "?"),
+            Token::Colon => write!(f, ":"),
+            Token::If => write!(f, "if"),
+            Token::Else => write!(f, "else"),
         }
     }
 }
@@ -186,7 +199,8 @@ pub fn is_binary(token: &Token) -> bool {
         | Token::Less
         | Token::Greater
         | Token::LessEq
-        | Token::GreaterEq => true,
+        | Token::GreaterEq
+        | Token::QuestionMark => true,
         _ => false,
     }
 }
@@ -211,7 +225,8 @@ pub fn precedence(token: &Token) -> usize {
         Token::Xor => 20,
         Token::Or => 15,
         Token::LAnd => 10,
-        Token::LOr => 5,
+        Token::LOr => 6,
+        Token::QuestionMark => 4,
         Token::CAddition
         | Token::CNegation
         | Token::CMultiplication

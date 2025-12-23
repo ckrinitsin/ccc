@@ -11,7 +11,8 @@ Supports:
 - Logical and relational operators (&&, ||, <, >, <=, >=, !=, ==)
 - Local variables (int)
 - Compound assignments and post/pre (inc/dec)rement (+=, /=, <<, ... and ++\<var\>, \<var\>-- ...) 
-- ~~If Statements~~
+- If Statements
+- ~~Compound Statements~~
 
 Here is an example of now compilable c code:
 ```

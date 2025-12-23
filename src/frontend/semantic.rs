@@ -76,6 +76,11 @@ fn resolve_expression(
                 *expr, hash_map,
             )?)))
         }
+        Expression::Conditional(left, middle, right) => Ok(Expression::Conditional(
+            Box::new(resolve_expression(*left, hash_map)?),
+            Box::new(resolve_expression(*middle, hash_map)?),
+            Box::new(resolve_expression(*right, hash_map)?),
+        )),
         c => Ok(c),
     }
 }
@@ -92,6 +97,18 @@ fn resolve_statement(
             expression, hash_map,
         )?)),
         Statement::Null => Ok(Statement::Null),
+        Statement::If(condition, if_statement, else_statement) => match else_statement {
+            Some(x) => Ok(Statement::If(
+                resolve_expression(condition, hash_map)?,
+                Box::new(resolve_statement(*if_statement, hash_map)?),
+                Some(Box::new(resolve_statement(*x, hash_map)?)),
+            )),
+            None => Ok(Statement::If(
+                resolve_expression(condition, hash_map)?,
+                Box::new(resolve_statement(*if_statement, hash_map)?),
+                None,
+            )),
+        },
     }
 }
 
