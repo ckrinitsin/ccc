@@ -327,6 +327,19 @@ fn parse_expression(
     }
 }
 
+fn parse_for_init(for_init: parser::ForInit, instructions: &mut Vec<Instruction>) -> Result<()> {
+    match for_init {
+        parser::ForInit::D(declaration) => parse_declaration(declaration, instructions),
+        parser::ForInit::E(opt_expression) => match opt_expression {
+            Some(expression) => {
+                parse_expression(expression, instructions)?;
+                Ok(())
+            }
+            None => Ok(()),
+        },
+    }
+}
+
 fn parse_statement(
     statement: parser::Statement,
     instructions: &mut Vec<Instruction>,
@@ -367,6 +380,58 @@ fn parse_statement(
             Ok(())
         }
         parser::Statement::Compound(block) => parse_block(block, instructions),
+        parser::Statement::While(expression, statement, label) => {
+            instructions.push(Instruction::Label(label.clone().unwrap() + "_continue"));
+            let cond = parse_expression(expression, instructions)?;
+            instructions.push(Instruction::JumpIfZero(
+                cond,
+                label.clone().unwrap() + "_break",
+            ));
+            parse_statement(*statement, instructions)?;
+            instructions.push(Instruction::Jump(label.clone().unwrap() + "_continue"));
+            instructions.push(Instruction::Label(label.unwrap() + "_break"));
+            Ok(())
+        }
+        parser::Statement::DoWhile(statement, expression, label) => {
+            instructions.push(Instruction::Label(label.clone().unwrap() + "_start"));
+            parse_statement(*statement, instructions)?;
+            instructions.push(Instruction::Label(label.clone().unwrap() + "_continue"));
+            let cond = parse_expression(expression, instructions)?;
+            instructions.push(Instruction::JumpIfNotZero(
+                cond,
+                label.clone().unwrap() + "_start",
+            ));
+            instructions.push(Instruction::Label(label.unwrap() + "_break"));
+            Ok(())
+        }
+        parser::Statement::For(for_init, opt_condition, opt_step, statement, label) => {
+            parse_for_init(for_init, instructions)?;
+            instructions.push(Instruction::Label(label.clone().unwrap() + "_start"));
+            if let Some(condition) = opt_condition {
+                let cond = parse_expression(condition, instructions)?;
+                instructions.push(Instruction::JumpIfZero(
+                    cond,
+                    label.clone().unwrap() + "_break",
+                ));
+            }
+            parse_statement(*statement, instructions)?;
+            instructions.push(Instruction::Label(label.clone().unwrap() + "_continue"));
+            if let Some(step) = opt_step {
+                parse_expression(step, instructions)?;
+            }
+
+            instructions.push(Instruction::Jump(label.clone().unwrap() + "_start"));
+            instructions.push(Instruction::Label(label.unwrap() + "_break"));
+            Ok(())
+        }
+        parser::Statement::Continue(label) => {
+            instructions.push(Instruction::Jump(label.unwrap() + "_continue"));
+            Ok(())
+        }
+        parser::Statement::Break(label) => {
+            instructions.push(Instruction::Jump(label.unwrap() + "_break"));
+            Ok(())
+        }
     }
 }
 

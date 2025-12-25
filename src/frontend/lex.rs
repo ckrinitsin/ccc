@@ -53,6 +53,11 @@ pub enum Token {
     QuestionMark,
     Colon,
     Goto,
+    Do,
+    While,
+    For,
+    Break,
+    Continue,
 }
 
 impl Token {
@@ -102,6 +107,11 @@ impl Token {
             (Regex::new(r"void\b").unwrap(), |_| Token::Void),
             (Regex::new(r"int\b").unwrap(), |_| Token::Int),
             (Regex::new(r"if\b").unwrap(), |_| Token::If),
+            (Regex::new(r"do\b").unwrap(), |_| Token::Do),
+            (Regex::new(r"while\b").unwrap(), |_| Token::While),
+            (Regex::new(r"for\b").unwrap(), |_| Token::For),
+            (Regex::new(r"break\b").unwrap(), |_| Token::Break),
+            (Regex::new(r"continue\b").unwrap(), |_| Token::Continue),
             (Regex::new(r"else\b").unwrap(), |_| Token::Else),
             (Regex::new(r"goto\b").unwrap(), |_| Token::Goto),
             (Regex::new(r"[0-9]+\b").unwrap(), |s| {
@@ -167,6 +177,11 @@ impl fmt::Display for Token {
             Token::Colon => write!(f, ":"),
             Token::If => write!(f, "if"),
             Token::Else => write!(f, "else"),
+            Token::Do => write!(f, "do"),
+            Token::While => write!(f, "while"),
+            Token::For => write!(f, "for"),
+            Token::Break => write!(f, "break"),
+            Token::Continue => write!(f, "continue"),
 
             Token::Goto => write!(f, "goto"),
         }

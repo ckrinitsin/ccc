@@ -4,7 +4,7 @@ use std::{
 };
 
 use crate::frontend::parser::{
-    Ast, Block, BlockItem, Declaration, Expression, Function, Statement, UnaryOp,
+    Ast, Block, BlockItem, Declaration, Expression, ForInit, Function, Statement, UnaryOp,
 };
 use anyhow::{Result, bail};
 
@@ -94,6 +94,29 @@ fn resolve_expression(
     }
 }
 
+fn resolve_optional_expression(
+    opt_expression: Option<Expression>,
+    hash_map: &mut HashMap<String, (String, bool)>,
+) -> Result<Option<Expression>> {
+    match opt_expression {
+        Some(expression) => Ok(Some(resolve_expression(expression, hash_map)?)),
+        None => Ok(None),
+    }
+}
+
+fn resolve_for_init(
+    for_init: ForInit,
+    hash_map: &mut HashMap<String, (String, bool)>,
+) -> Result<ForInit> {
+    match for_init {
+        ForInit::D(declaration) => Ok(ForInit::D(resolve_declaration(declaration, hash_map)?)),
+        ForInit::E(opt_expression) => Ok(ForInit::E(resolve_optional_expression(
+            opt_expression,
+            hash_map,
+        )?)),
+    }
+}
+
 fn resolve_statement(
     statement: Statement,
     hash_map: &mut HashMap<String, (String, bool)>,
@@ -122,7 +145,6 @@ fn resolve_statement(
             id,
             Box::new(resolve_statement(*statement, hash_map)?),
         )),
-        Statement::Goto(id) => Ok(Statement::Goto(id)),
         Statement::Compound(block) => {
             let mut inner_hash_map = copy_hashmap(&hash_map);
             Ok(Statement::Compound(resolve_block(
@@ -130,6 +152,31 @@ fn resolve_statement(
                 &mut inner_hash_map,
             )?))
         }
+        Statement::While(expression, statement, label) => Ok(Statement::While(
+            resolve_expression(expression, hash_map)?,
+            Box::new(resolve_statement(*statement, hash_map)?),
+            label,
+        )),
+        Statement::DoWhile(statement, expression, label) => Ok(Statement::DoWhile(
+            Box::new(resolve_statement(*statement, hash_map)?),
+            resolve_expression(expression, hash_map)?,
+            label,
+        )),
+        Statement::For(for_init, condition, step, body, label) => {
+            let mut inner_hash_map = copy_hashmap(&hash_map);
+            let for_init = resolve_for_init(for_init, &mut inner_hash_map)?;
+            let condition = resolve_optional_expression(condition, &mut inner_hash_map)?;
+            let step = resolve_optional_expression(step, &mut inner_hash_map)?;
+            let body = resolve_statement(*body, &mut inner_hash_map)?;
+            Ok(Statement::For(
+                for_init,
+                condition,
+                step,
+                Box::new(body),
+                label,
+            ))
+        }
+        c => Ok(c),
     }
 }
 

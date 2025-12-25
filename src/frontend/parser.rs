@@ -33,10 +33,27 @@ pub enum Statement {
     Return(Expression),
     Expression(Expression),
     If(Expression, Box<Statement>, Option<Box<Statement>>),
+    While(Expression, Box<Statement>, Option<String>),
+    DoWhile(Box<Statement>, Expression, Option<String>),
+    For(
+        ForInit,
+        Option<Expression>,
+        Option<Expression>,
+        Box<Statement>,
+        Option<String>,
+    ),
+    Continue(Option<String>),
+    Break(Option<String>),
     Compound(Block),
     Labeled(String, Box<Statement>),
     Goto(String),
     Null,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum ForInit {
+    D(Declaration),
+    E(Option<Expression>),
 }
 
 #[derive(Debug, PartialEq)]
@@ -273,8 +290,29 @@ fn parse_expression(tokens: &mut VecDeque<Token>, order: usize) -> Result<Expres
     Ok(left)
 }
 
+/* for_init ::= <declaration> | [ <expression> ] ";" */
+fn parse_for_init(tokens: &mut VecDeque<Token>) -> Result<ForInit> {
+    match &tokens[0] {
+        Token::Int => Ok(ForInit::D(parse_declaration(tokens)?)),
+        Token::Semicolon => {
+            expect_token(Token::Semicolon, tokens.pop_front())?;
+            Ok(ForInit::E(None))
+        }
+        _ => {
+            let expr = Some(parse_expression(tokens, 0)?);
+            expect_token(Token::Semicolon, tokens.pop_front())?;
+            Ok(ForInit::E(expr))
+        }
+    }
+}
+
 /* statement ::= "return" <expression> ";" | ";" | <expression> ";"
  *  | "if" "(" <expression> ")" <statement> [ "else" <statement> ]
+ *  | "while" "(" <expression> ")" <statement>
+ *  | "do" <statement> "while" "(" <expression> ")" ";"
+ *  | "for" "(" <for-init> [ <expression> ] ";" [ <expression> ] ")" <statement>
+ *  | "continue" ";"
+ *  | "break" ";"
  *  | <identifier> ":" <statement>
  *  | "goto" <identifier> ";"
  *  | <block> */
@@ -318,6 +356,57 @@ fn parse_statement(tokens: &mut VecDeque<Token>) -> Result<Statement> {
         (Token::OpenBrace, _) => {
             let block = parse_block(tokens)?;
             Ok(Statement::Compound(block))
+        }
+        (Token::Continue, _) => {
+            expect_token(Token::Continue, tokens.pop_front())?;
+            expect_token(Token::Semicolon, tokens.pop_front())?;
+            Ok(Statement::Continue(None))
+        }
+        (Token::Break, _) => {
+            expect_token(Token::Break, tokens.pop_front())?;
+            expect_token(Token::Semicolon, tokens.pop_front())?;
+            Ok(Statement::Break(None))
+        }
+        (Token::While, _) => {
+            expect_token(Token::While, tokens.pop_front())?;
+            expect_token(Token::OpenParanthesis, tokens.pop_front())?;
+            let condition = parse_expression(tokens, 0)?;
+            expect_token(Token::CloseParanthesis, tokens.pop_front())?;
+            let body = parse_statement(tokens)?;
+            Ok(Statement::While(condition, Box::new(body), None))
+        }
+        (Token::Do, _) => {
+            expect_token(Token::Do, tokens.pop_front())?;
+            let body = parse_statement(tokens)?;
+            expect_token(Token::While, tokens.pop_front())?;
+            expect_token(Token::OpenParanthesis, tokens.pop_front())?;
+            let condition = parse_expression(tokens, 0)?;
+            expect_token(Token::CloseParanthesis, tokens.pop_front())?;
+            expect_token(Token::Semicolon, tokens.pop_front())?;
+            Ok(Statement::DoWhile(Box::new(body), condition, None))
+        }
+        (Token::For, _) => {
+            expect_token(Token::For, tokens.pop_front())?;
+            expect_token(Token::OpenParanthesis, tokens.pop_front())?;
+            let for_init = parse_for_init(tokens)?;
+            let mut condition = None;
+            if !matches!(tokens[0], Token::Semicolon) {
+                condition = Some(parse_expression(tokens, 0)?);
+            }
+            expect_token(Token::Semicolon, tokens.pop_front())?;
+            let mut step = None;
+            if !matches!(tokens[0], Token::CloseParanthesis) {
+                step = Some(parse_expression(tokens, 0)?);
+            }
+            expect_token(Token::CloseParanthesis, tokens.pop_front())?;
+            let statement = parse_statement(tokens)?;
+            Ok(Statement::For(
+                for_init,
+                condition,
+                step,
+                Box::new(statement),
+                None,
+            ))
         }
         _ => {
             let expression = parse_expression(tokens, 0)?;
