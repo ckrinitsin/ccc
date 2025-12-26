@@ -6,7 +6,7 @@ use std::fmt;
 #[derive(Debug, PartialEq)]
 pub enum Token {
     Identifier(String),
-    Constant(i64),
+    Constant(i32),
     Int,
     Void,
     Return,
@@ -58,6 +58,9 @@ pub enum Token {
     For,
     Break,
     Continue,
+    Switch,
+    Case,
+    Default,
 }
 
 impl Token {
@@ -114,8 +117,11 @@ impl Token {
             (Regex::new(r"continue\b").unwrap(), |_| Token::Continue),
             (Regex::new(r"else\b").unwrap(), |_| Token::Else),
             (Regex::new(r"goto\b").unwrap(), |_| Token::Goto),
+            (Regex::new(r"switch\b").unwrap(), |_| Token::Switch),
+            (Regex::new(r"case\b").unwrap(), |_| Token::Case),
+            (Regex::new(r"default\b").unwrap(), |_| Token::Default),
             (Regex::new(r"[0-9]+\b").unwrap(), |s| {
-                Token::Constant(s.parse::<i64>().unwrap())
+                Token::Constant(s.parse::<i32>().unwrap())
             }),
             (Regex::new(r"[a-zA-Z_]\w*\b").unwrap(), |s| {
                 Token::Identifier(s.to_string())
@@ -182,8 +188,10 @@ impl fmt::Display for Token {
             Token::For => write!(f, "for"),
             Token::Break => write!(f, "break"),
             Token::Continue => write!(f, "continue"),
-
             Token::Goto => write!(f, "goto"),
+            Token::Switch => write!(f, "switch"),
+            Token::Case => write!(f, "case"),
+            Token::Default => write!(f, "default"),
         }
     }
 }

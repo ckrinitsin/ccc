@@ -30,7 +30,7 @@ pub enum Instruction {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Operand {
-    Immediate(i64),
+    Immediate(i32),
     Register(Reg),
     Pseudo(String),
     Stack(i32),

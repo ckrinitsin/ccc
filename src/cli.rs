@@ -2,6 +2,7 @@ use crate::backend::codegen;
 use crate::frontend::ir;
 use crate::frontend::label_resolution;
 use crate::frontend::lex;
+use crate::frontend::loop_resolution;
 use crate::frontend::parser;
 use crate::frontend::variable_resolution;
 use anyhow::Result;
@@ -88,6 +89,7 @@ pub fn cli() -> Result<()> {
 
     let analyzed_ast = variable_resolution::variable_resolution(ast)?;
     let analyzed_ast = label_resolution::label_resolution(analyzed_ast)?;
+    let analyzed_ast = loop_resolution::loop_resolution(analyzed_ast)?;
 
     if args.validate {
         println!("Analyzed Ast:");

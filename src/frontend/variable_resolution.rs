@@ -176,6 +176,21 @@ fn resolve_statement(
                 label,
             ))
         }
+        Statement::Case(expression, statement, label) => Ok(Statement::Case(
+            expression,
+            Box::new(resolve_statement(*statement, hash_map)?),
+            label,
+        )),
+        Statement::Switch(expression, statement, label, cases) => Ok(Statement::Switch(
+            resolve_expression(expression, hash_map)?,
+            Box::new(resolve_statement(*statement, hash_map)?),
+            label,
+            cases,
+        )),
+        Statement::Default(statement, label) => Ok(Statement::Default(
+            Box::new(resolve_statement(*statement, hash_map)?),
+            label,
+        )),
         c => Ok(c),
     }
 }

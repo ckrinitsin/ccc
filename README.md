@@ -13,7 +13,8 @@ Supports:
 - Compound assignments and post/pre (inc/dec)rement (+=, /=, <<, ... and ++\<var\>, \<var\>-- ...) 
 - If Statements (and goto + labeled statements)
 - Compound Statements
-- ~~Loops~~
+- Loops and Switch Statements
+- ~~Function calls~~
 
 Here is an example of now compilable c code:
 ```

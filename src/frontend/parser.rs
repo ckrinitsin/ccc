@@ -42,6 +42,14 @@ pub enum Statement {
         Box<Statement>,
         Option<String>,
     ),
+    Switch(
+        Expression,
+        Box<Statement>,
+        Option<String>,
+        Vec<(Option<i32>, String)>,
+    ),
+    Default(Box<Statement>, Option<String>),
+    Case(Expression, Box<Statement>, Option<String>),
     Continue(Option<String>),
     Break(Option<String>),
     Compound(Block),
@@ -58,7 +66,7 @@ pub enum ForInit {
 
 #[derive(Debug, PartialEq)]
 pub enum Expression {
-    Constant(i64),
+    Constant(i32),
     Variable(String),
     Unary(UnaryOp, Box<Expression>),
     Binary(BinaryOp, Box<Expression>, Box<Expression>),
@@ -153,8 +161,8 @@ fn expect_token(expect: Token, actual: Option<Token>) -> Result<()> {
     }
 }
 
-/* constant ::= An i64 */
-fn parse_constant(tokens: &mut VecDeque<Token>) -> Result<i64> {
+/* constant ::= An i32 */
+fn parse_constant(tokens: &mut VecDeque<Token>) -> Result<i32> {
     match tokens.pop_front() {
         Some(Token::Constant(x)) => Ok(x),
         Some(x) => bail!("Expected a constant but found {}", x),
@@ -311,6 +319,9 @@ fn parse_for_init(tokens: &mut VecDeque<Token>) -> Result<ForInit> {
  *  | "while" "(" <expression> ")" <statement>
  *  | "do" <statement> "while" "(" <expression> ")" ";"
  *  | "for" "(" <for-init> [ <expression> ] ";" [ <expression> ] ")" <statement>
+ *  | "switch" "(" <expression> ")" <statement>
+ *  | "case" <expression> ":" <statement>
+ *  | "default" ":" <statement>
  *  | "continue" ";"
  *  | "break" ";"
  *  | <identifier> ":" <statement>
@@ -406,6 +417,32 @@ fn parse_statement(tokens: &mut VecDeque<Token>) -> Result<Statement> {
                 step,
                 Box::new(statement),
                 None,
+            ))
+        }
+        (Token::Default, _) => {
+            expect_token(Token::Default, tokens.pop_front())?;
+            expect_token(Token::Colon, tokens.pop_front())?;
+            let statement = parse_statement(tokens)?;
+            Ok(Statement::Default(Box::new(statement), None))
+        }
+        (Token::Case, _) => {
+            expect_token(Token::Case, tokens.pop_front())?;
+            let expression = parse_expression(tokens, 0)?;
+            expect_token(Token::Colon, tokens.pop_front())?;
+            let statement = parse_statement(tokens)?;
+            Ok(Statement::Case(expression, Box::new(statement), None))
+        }
+        (Token::Switch, _) => {
+            expect_token(Token::Switch, tokens.pop_front())?;
+            expect_token(Token::OpenParanthesis, tokens.pop_front())?;
+            let expression = parse_expression(tokens, 0)?;
+            expect_token(Token::CloseParanthesis, tokens.pop_front())?;
+            let statement = parse_statement(tokens)?;
+            Ok(Statement::Switch(
+                expression,
+                Box::new(statement),
+                None,
+                Vec::new(),
             ))
         }
         _ => {

@@ -30,7 +30,7 @@ pub enum Instruction {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Operand {
-    Constant(i64),
+    Constant(i32),
     Variable(String),
 }
 
@@ -90,7 +90,7 @@ impl fmt::Display for Instruction {
         match self {
             Instruction::Unary(op, src, dst) => write!(f, "{} = {}{}", dst, op, src),
             Instruction::Binary(op, src1, src2, dst) => {
-                write!(f, "{} = {}{}{}", dst, src1, op, src2)
+                write!(f, "{} = {} {} {}", dst, src1, op, src2)
             }
             Instruction::Ret(val) => write!(f, "return {}", val),
             Instruction::Copy(src, dst) => write!(f, "{} = {}", dst, src),
@@ -430,6 +430,47 @@ fn parse_statement(
         }
         parser::Statement::Break(label) => {
             instructions.push(Instruction::Jump(label.unwrap() + "_break"));
+            Ok(())
+        }
+        parser::Statement::Switch(expression, statement, label, items) => {
+            let switch_operand = parse_expression(expression, instructions)?;
+            let mut default_case: Option<String> = None;
+
+            for item in items {
+                if item.0 == None {
+                    default_case = Some(item.1);
+                    continue;
+                }
+                let cmp_tmp = gen_temp();
+                if let Some(constant) = item.0 {
+                    instructions.push(Instruction::Binary(
+                        BinOp::Equal,
+                        switch_operand.clone(),
+                        Operand::Constant(constant),
+                        cmp_tmp.clone(),
+                    ));
+                    instructions.push(Instruction::JumpIfNotZero(cmp_tmp, item.1));
+                }
+            }
+
+            if let Some(str) = default_case {
+                instructions.push(Instruction::Jump(str));
+            } else {
+                instructions.push(Instruction::Jump(label.clone().unwrap() + "_break"));
+            }
+
+            parse_statement(*statement, instructions)?;
+            instructions.push(Instruction::Label(label.unwrap() + "_break"));
+            Ok(())
+        }
+        parser::Statement::Default(statement, label) => {
+            instructions.push(Instruction::Label(label.unwrap()));
+            parse_statement(*statement, instructions)?;
+            Ok(())
+        }
+        parser::Statement::Case(_, statement, label) => {
+            instructions.push(Instruction::Label(label.unwrap()));
+            parse_statement(*statement, instructions)?;
             Ok(())
         }
     }
