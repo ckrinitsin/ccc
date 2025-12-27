@@ -1,6 +1,6 @@
 # Chris' C Compiler
 
-An attempt to write an (educational) C compiler. Provides a Lexer, Parser and a Code Generator (x86\_64).
+An attempt to write an (educational) C(17) compiler. Provides a Lexer, Parser and a Code Generator (x86\_64).
 
 The compiler driver uses GCC's preprocessor and assembler/linker, to help turning the code into an executable.
 
@@ -14,7 +14,8 @@ Supports:
 - If Statements (and goto + labeled statements)
 - Compound Statements
 - Loops and Switch Statements
-- ~~Function calls~~
+- Function calls
+- ~~File scope~~
 
 Here is an example of now compilable c code:
 ```
