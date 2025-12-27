@@ -1,12 +1,12 @@
 use ccc::frontend::ir::*;
-use ccc::frontend::parser;
+use ccc::frontend::parse;
 
 #[test]
 fn simple_ast_to_ir() {
-    let input = parser::Ast::Program(parser::Function::Function(
+    let input = parse::Ast::Program(parse::Function::Function(
         "main".to_string(),
-        parser::Block::B(vec![parser::BlockItem::S(parser::Statement::Return(
-            parser::Expression::Constant(2),
+        parse::Block::B(vec![parse::BlockItem::S(parse::Statement::Return(
+            parse::Expression::Constant(2),
         ))]),
     ));
 
@@ -24,12 +24,12 @@ fn simple_ast_to_ir() {
 
 #[test]
 fn unop_to_ir() {
-    let input = parser::Ast::Program(parser::Function::Function(
+    let input = parse::Ast::Program(parse::Function::Function(
         "main".to_string(),
-        parser::Block::B(vec![parser::BlockItem::S(parser::Statement::Return(
-            parser::Expression::Unary(
-                parser::UnaryOp::Complement,
-                Box::new(parser::Expression::Constant(2)),
+        parse::Block::B(vec![parse::BlockItem::S(parse::Statement::Return(
+            parse::Expression::Unary(
+                parse::UnaryOp::Complement,
+                Box::new(parse::Expression::Constant(2)),
             ),
         ))]),
     ));
@@ -53,16 +53,16 @@ fn unop_to_ir() {
 
 #[test]
 fn recursive_unop_to_ir() {
-    let input = parser::Ast::Program(parser::Function::Function(
+    let input = parse::Ast::Program(parse::Function::Function(
         "main".to_string(),
-        parser::Block::B(vec![parser::BlockItem::S(parser::Statement::Return(
-            parser::Expression::Unary(
-                parser::UnaryOp::Negation,
-                Box::new(parser::Expression::Unary(
-                    parser::UnaryOp::Complement,
-                    Box::new(parser::Expression::Unary(
-                        parser::UnaryOp::Negation,
-                        Box::new(parser::Expression::Constant(2)),
+        parse::Block::B(vec![parse::BlockItem::S(parse::Statement::Return(
+            parse::Expression::Unary(
+                parse::UnaryOp::Negation,
+                Box::new(parse::Expression::Unary(
+                    parse::UnaryOp::Complement,
+                    Box::new(parse::Expression::Unary(
+                        parse::UnaryOp::Negation,
+                        Box::new(parse::Expression::Constant(2)),
                     )),
                 )),
             ),

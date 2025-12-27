@@ -52,6 +52,7 @@ pub enum Token {
     Else,
     QuestionMark,
     Colon,
+    Comma,
     Goto,
     Do,
     While,
@@ -89,6 +90,7 @@ impl Token {
             (Regex::new(r"\-\-").unwrap(), |_| Token::Decrement),
             (Regex::new(r"\?").unwrap(), |_| Token::QuestionMark),
             (Regex::new(r"\:").unwrap(), |_| Token::Colon),
+            (Regex::new(r"\,").unwrap(), |_| Token::Comma),
             (Regex::new(r"<").unwrap(), |_| Token::Less),
             (Regex::new(r">").unwrap(), |_| Token::Greater),
             (Regex::new(r"\-").unwrap(), |_| Token::Negation),
@@ -181,6 +183,7 @@ impl fmt::Display for Token {
 
             Token::QuestionMark => write!(f, "?"),
             Token::Colon => write!(f, ":"),
+            Token::Comma => write!(f, ","),
             Token::If => write!(f, "if"),
             Token::Else => write!(f, "else"),
             Token::Do => write!(f, "do"),

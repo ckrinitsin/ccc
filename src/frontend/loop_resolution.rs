@@ -3,7 +3,7 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use crate::frontend::parser::{Ast, Block, BlockItem, Expression, Function, Statement};
+use crate::frontend::parse::{Ast, Block, BlockItem, Expression, Function, Statement};
 use anyhow::{Result, bail};
 
 fn gen_label(id: String) -> String {

@@ -4,7 +4,7 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use crate::frontend::parser;
+use crate::frontend::parse;
 
 #[derive(Debug, PartialEq)]
 pub enum TAC {
@@ -163,45 +163,45 @@ fn gen_label() -> String {
     "_".to_string() + &counter.to_string()
 }
 
-fn parse_unary_op(expr: parser::UnaryOp) -> Result<UnOp> {
+fn parse_unary_op(expr: parse::UnaryOp) -> Result<UnOp> {
     match expr {
-        parser::UnaryOp::Complement => Ok(UnOp::Complement),
-        parser::UnaryOp::Negation => Ok(UnOp::Negation),
-        parser::UnaryOp::Not => Ok(UnOp::Not),
-        parser::UnaryOp::Increment => Ok(UnOp::Increment),
-        parser::UnaryOp::Decrement => Ok(UnOp::Decrement),
+        parse::UnaryOp::Complement => Ok(UnOp::Complement),
+        parse::UnaryOp::Negation => Ok(UnOp::Negation),
+        parse::UnaryOp::Not => Ok(UnOp::Not),
+        parse::UnaryOp::Increment => Ok(UnOp::Increment),
+        parse::UnaryOp::Decrement => Ok(UnOp::Decrement),
     }
 }
 
-fn parse_binary_op(expr: parser::BinaryOp) -> Result<BinOp> {
+fn parse_binary_op(expr: parse::BinaryOp) -> Result<BinOp> {
     match expr {
-        parser::BinaryOp::Addition => Ok(BinOp::Addition),
-        parser::BinaryOp::Subtraction => Ok(BinOp::Subtraction),
-        parser::BinaryOp::Multiplication => Ok(BinOp::Multiplication),
-        parser::BinaryOp::Division => Ok(BinOp::Division),
-        parser::BinaryOp::Modulo => Ok(BinOp::Modulo),
-        parser::BinaryOp::And => Ok(BinOp::And),
-        parser::BinaryOp::Or => Ok(BinOp::Or),
-        parser::BinaryOp::Xor => Ok(BinOp::Xor),
-        parser::BinaryOp::LShift => Ok(BinOp::LShift),
-        parser::BinaryOp::RShift => Ok(BinOp::RShift),
-        parser::BinaryOp::Equal => Ok(BinOp::Equal),
-        parser::BinaryOp::NEqual => Ok(BinOp::NEqual),
-        parser::BinaryOp::Less => Ok(BinOp::Less),
-        parser::BinaryOp::Greater => Ok(BinOp::Greater),
-        parser::BinaryOp::LessEq => Ok(BinOp::LessEq),
-        parser::BinaryOp::GreaterEq => Ok(BinOp::GreaterEq),
+        parse::BinaryOp::Addition => Ok(BinOp::Addition),
+        parse::BinaryOp::Subtraction => Ok(BinOp::Subtraction),
+        parse::BinaryOp::Multiplication => Ok(BinOp::Multiplication),
+        parse::BinaryOp::Division => Ok(BinOp::Division),
+        parse::BinaryOp::Modulo => Ok(BinOp::Modulo),
+        parse::BinaryOp::And => Ok(BinOp::And),
+        parse::BinaryOp::Or => Ok(BinOp::Or),
+        parse::BinaryOp::Xor => Ok(BinOp::Xor),
+        parse::BinaryOp::LShift => Ok(BinOp::LShift),
+        parse::BinaryOp::RShift => Ok(BinOp::RShift),
+        parse::BinaryOp::Equal => Ok(BinOp::Equal),
+        parse::BinaryOp::NEqual => Ok(BinOp::NEqual),
+        parse::BinaryOp::Less => Ok(BinOp::Less),
+        parse::BinaryOp::Greater => Ok(BinOp::Greater),
+        parse::BinaryOp::LessEq => Ok(BinOp::LessEq),
+        parse::BinaryOp::GreaterEq => Ok(BinOp::GreaterEq),
         x => bail!("{:?} should be handled seperately", x),
     }
 }
 
 fn parse_expression(
-    expr: parser::Expression,
+    expr: parse::Expression,
     instructions: &mut Vec<Instruction>,
 ) -> Result<Operand> {
     match expr {
-        parser::Expression::Constant(c) => Ok(Operand::Constant(c)),
-        parser::Expression::Unary(unary_op, expression) => {
+        parse::Expression::Constant(c) => Ok(Operand::Constant(c)),
+        parse::Expression::Unary(unary_op, expression) => {
             let src = parse_expression(*expression, instructions)?;
             let op = parse_unary_op(unary_op)?;
 
@@ -215,8 +215,8 @@ fn parse_expression(
 
             Ok(dst)
         }
-        parser::Expression::Binary(
-            binary_op @ (parser::BinaryOp::LAnd | parser::BinaryOp::LOr),
+        parse::Expression::Binary(
+            binary_op @ (parse::BinaryOp::LAnd | parse::BinaryOp::LOr),
             expression1,
             expression2,
         ) => {
@@ -224,14 +224,14 @@ fn parse_expression(
             let end_label = label.to_string() + "_end";
             let src1 = parse_expression(*expression1, instructions)?;
             let dst = gen_temp();
-            if binary_op == parser::BinaryOp::LAnd {
+            if binary_op == parse::BinaryOp::LAnd {
                 instructions.push(Instruction::JumpIfZero(src1, label.clone()));
             } else {
                 instructions.push(Instruction::JumpIfNotZero(src1, label.clone()));
             }
 
             let src2 = parse_expression(*expression2, instructions)?;
-            if binary_op == parser::BinaryOp::LAnd {
+            if binary_op == parse::BinaryOp::LAnd {
                 instructions.push(Instruction::JumpIfZero(src2, label.clone()));
                 instructions.push(Instruction::Copy(Operand::Constant(1), dst.clone()));
                 instructions.push(Instruction::Jump(end_label.clone()));
@@ -249,7 +249,7 @@ fn parse_expression(
 
             Ok(dst)
         }
-        parser::Expression::Binary(binary_op, expression1, expression2) => {
+        parse::Expression::Binary(binary_op, expression1, expression2) => {
             let src1 = parse_expression(*expression1, instructions)?;
             let src2 = parse_expression(*expression2, instructions)?;
             let dst = gen_temp();
@@ -259,9 +259,9 @@ fn parse_expression(
 
             Ok(dst)
         }
-        parser::Expression::Variable(v) => Ok(Operand::Variable(v)),
-        parser::Expression::Assignment(var, right) => {
-            if let parser::Expression::Variable(v) = *var {
+        parse::Expression::Variable(v) => Ok(Operand::Variable(v)),
+        parse::Expression::Assignment(var, right) => {
+            if let parse::Expression::Variable(v) = *var {
                 let src = parse_expression(*right, instructions)?;
                 instructions.push(Instruction::Copy(src, Operand::Variable(v.clone())));
                 Ok(Operand::Variable(v))
@@ -269,8 +269,8 @@ fn parse_expression(
                 bail!("Lvalue of Assignment must be a variable!");
             }
         }
-        parser::Expression::CompoundAssignment(binary_op, var, right) => {
-            if let parser::Expression::Variable(v) = *var {
+        parse::Expression::CompoundAssignment(binary_op, var, right) => {
+            if let parse::Expression::Variable(v) = *var {
                 let right = parse_expression(*right, instructions)?;
                 instructions.push(Instruction::Binary(
                     parse_binary_op(binary_op)?,
@@ -283,7 +283,7 @@ fn parse_expression(
                 bail!("Lvalue of Assignment must be a variable!");
             }
         }
-        parser::Expression::PostIncr(expr) => {
+        parse::Expression::PostIncr(expr) => {
             let dst = gen_temp();
             let src = parse_expression(*expr, instructions)?;
             instructions.push(Instruction::Copy(src.clone(), dst.clone()));
@@ -295,7 +295,7 @@ fn parse_expression(
             ));
             Ok(dst)
         }
-        parser::Expression::PostDecr(expr) => {
+        parse::Expression::PostDecr(expr) => {
             let dst = gen_temp();
             let src = parse_expression(*expr, instructions)?;
             instructions.push(Instruction::Copy(src.clone(), dst.clone()));
@@ -307,7 +307,7 @@ fn parse_expression(
             ));
             Ok(dst)
         }
-        parser::Expression::Conditional(left, middle, right) => {
+        parse::Expression::Conditional(left, middle, right) => {
             let dst = gen_temp();
             let label_false = gen_label();
             let end_label = label_false.to_string() + "_end";
@@ -327,10 +327,10 @@ fn parse_expression(
     }
 }
 
-fn parse_for_init(for_init: parser::ForInit, instructions: &mut Vec<Instruction>) -> Result<()> {
+fn parse_for_init(for_init: parse::ForInit, instructions: &mut Vec<Instruction>) -> Result<()> {
     match for_init {
-        parser::ForInit::D(declaration) => parse_declaration(declaration, instructions),
-        parser::ForInit::E(opt_expression) => match opt_expression {
+        parse::ForInit::D(declaration) => parse_declaration(declaration, instructions),
+        parse::ForInit::E(opt_expression) => match opt_expression {
             Some(expression) => {
                 parse_expression(expression, instructions)?;
                 Ok(())
@@ -340,22 +340,19 @@ fn parse_for_init(for_init: parser::ForInit, instructions: &mut Vec<Instruction>
     }
 }
 
-fn parse_statement(
-    statement: parser::Statement,
-    instructions: &mut Vec<Instruction>,
-) -> Result<()> {
+fn parse_statement(statement: parse::Statement, instructions: &mut Vec<Instruction>) -> Result<()> {
     match statement {
-        parser::Statement::Return(expression) => {
+        parse::Statement::Return(expression) => {
             let dst = parse_expression(expression, instructions)?;
             instructions.push(Instruction::Ret(dst));
             Ok(())
         }
-        parser::Statement::Expression(expression) => {
+        parse::Statement::Expression(expression) => {
             parse_expression(expression, instructions)?;
             Ok(())
         }
-        parser::Statement::Null => Ok(()),
-        parser::Statement::If(condition, if_statement, else_statement) => {
+        parse::Statement::Null => Ok(()),
+        parse::Statement::If(condition, if_statement, else_statement) => {
             let label_else = gen_label();
             let end_label = label_else.to_string() + "_else";
 
@@ -371,16 +368,16 @@ fn parse_statement(
 
             Ok(())
         }
-        parser::Statement::Labeled(label, statement) => {
+        parse::Statement::Labeled(label, statement) => {
             instructions.push(Instruction::Label(label));
             parse_statement(*statement, instructions)
         }
-        parser::Statement::Goto(label) => {
+        parse::Statement::Goto(label) => {
             instructions.push(Instruction::Jump(label));
             Ok(())
         }
-        parser::Statement::Compound(block) => parse_block(block, instructions),
-        parser::Statement::While(expression, statement, label) => {
+        parse::Statement::Compound(block) => parse_block(block, instructions),
+        parse::Statement::While(expression, statement, label) => {
             instructions.push(Instruction::Label(label.clone().unwrap() + "_continue"));
             let cond = parse_expression(expression, instructions)?;
             instructions.push(Instruction::JumpIfZero(
@@ -392,7 +389,7 @@ fn parse_statement(
             instructions.push(Instruction::Label(label.unwrap() + "_break"));
             Ok(())
         }
-        parser::Statement::DoWhile(statement, expression, label) => {
+        parse::Statement::DoWhile(statement, expression, label) => {
             instructions.push(Instruction::Label(label.clone().unwrap() + "_start"));
             parse_statement(*statement, instructions)?;
             instructions.push(Instruction::Label(label.clone().unwrap() + "_continue"));
@@ -404,7 +401,7 @@ fn parse_statement(
             instructions.push(Instruction::Label(label.unwrap() + "_break"));
             Ok(())
         }
-        parser::Statement::For(for_init, opt_condition, opt_step, statement, label) => {
+        parse::Statement::For(for_init, opt_condition, opt_step, statement, label) => {
             parse_for_init(for_init, instructions)?;
             instructions.push(Instruction::Label(label.clone().unwrap() + "_start"));
             if let Some(condition) = opt_condition {
@@ -424,15 +421,15 @@ fn parse_statement(
             instructions.push(Instruction::Label(label.unwrap() + "_break"));
             Ok(())
         }
-        parser::Statement::Continue(label) => {
+        parse::Statement::Continue(label) => {
             instructions.push(Instruction::Jump(label.unwrap() + "_continue"));
             Ok(())
         }
-        parser::Statement::Break(label) => {
+        parse::Statement::Break(label) => {
             instructions.push(Instruction::Jump(label.unwrap() + "_break"));
             Ok(())
         }
-        parser::Statement::Switch(expression, statement, label, items) => {
+        parse::Statement::Switch(expression, statement, label, items) => {
             let switch_operand = parse_expression(expression, instructions)?;
             let mut default_case: Option<String> = None;
 
@@ -463,12 +460,12 @@ fn parse_statement(
             instructions.push(Instruction::Label(label.unwrap() + "_break"));
             Ok(())
         }
-        parser::Statement::Default(statement, label) => {
+        parse::Statement::Default(statement, label) => {
             instructions.push(Instruction::Label(label.unwrap()));
             parse_statement(*statement, instructions)?;
             Ok(())
         }
-        parser::Statement::Case(_, statement, label) => {
+        parse::Statement::Case(_, statement, label) => {
             instructions.push(Instruction::Label(label.unwrap()));
             parse_statement(*statement, instructions)?;
             Ok(())
@@ -476,10 +473,10 @@ fn parse_statement(
     }
 }
 
-fn parse_declaration(decl: parser::Declaration, instructions: &mut Vec<Instruction>) -> Result<()> {
+fn parse_declaration(decl: parse::Declaration, instructions: &mut Vec<Instruction>) -> Result<()> {
     match decl {
-        parser::Declaration::Declaration(_, None) => Ok(()),
-        parser::Declaration::Declaration(id, Some(expression)) => {
+        parse::Declaration::Declaration(_, None) => Ok(()),
+        parse::Declaration::Declaration(id, Some(expression)) => {
             let src = parse_expression(expression, instructions)?;
             instructions.push(Instruction::Copy(src, Operand::Variable(id)));
             Ok(())
@@ -487,16 +484,16 @@ fn parse_declaration(decl: parser::Declaration, instructions: &mut Vec<Instructi
     }
 }
 
-fn parse_block_item(bl: parser::BlockItem, instructions: &mut Vec<Instruction>) -> Result<()> {
+fn parse_block_item(bl: parse::BlockItem, instructions: &mut Vec<Instruction>) -> Result<()> {
     match bl {
-        parser::BlockItem::S(statement) => parse_statement(statement, instructions),
-        parser::BlockItem::D(declaration) => parse_declaration(declaration, instructions),
+        parse::BlockItem::S(statement) => parse_statement(statement, instructions),
+        parse::BlockItem::D(declaration) => parse_declaration(declaration, instructions),
     }
 }
 
-fn parse_block(bl: parser::Block, instructions: &mut Vec<Instruction>) -> Result<()> {
+fn parse_block(bl: parse::Block, instructions: &mut Vec<Instruction>) -> Result<()> {
     match bl {
-        parser::Block::B(block_items) => {
+        parse::Block::B(block_items) => {
             for block in block_items {
                 parse_block_item(block, instructions)?;
             }
@@ -505,10 +502,10 @@ fn parse_block(bl: parser::Block, instructions: &mut Vec<Instruction>) -> Result
     }
 }
 
-fn parse_function(fun: parser::Function) -> Result<Function> {
+fn parse_function(fun: parse::Function) -> Result<Function> {
     let mut instructions = Vec::new();
     match fun {
-        parser::Function::Function(name, body) => {
+        parse::Function::Function(name, body) => {
             parse_block(body, &mut instructions)?;
             instructions.push(Instruction::Ret(Operand::Constant(0)));
             Ok(Function::Function(name, instructions))
@@ -516,10 +513,10 @@ fn parse_function(fun: parser::Function) -> Result<Function> {
     }
 }
 
-pub fn lift_to_ir(prog: parser::Ast) -> Result<TAC> {
+pub fn lift_to_ir(prog: parse::Ast) -> Result<TAC> {
     COUNTER_TMP.store(0, Ordering::SeqCst);
     COUNTER_LABEL.store(0, Ordering::SeqCst);
     match prog {
-        parser::Ast::Program(fun) => Ok(TAC::Program(parse_function(fun)?)),
+        parse::Ast::Program(fun) => Ok(TAC::Program(parse_function(fun)?)),
     }
 }

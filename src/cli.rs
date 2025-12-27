@@ -3,7 +3,7 @@ use crate::frontend::ir;
 use crate::frontend::label_resolution;
 use crate::frontend::lex;
 use crate::frontend::loop_resolution;
-use crate::frontend::parser;
+use crate::frontend::parse;
 use crate::frontend::variable_resolution;
 use anyhow::Result;
 use anyhow::bail;
@@ -95,7 +95,7 @@ pub fn cli() -> Result<()> {
             continue;
         }
 
-        let ast = parser::parse_tokens(tokens)?;
+        let ast = parse::parse_tokens(tokens)?;
 
         if args.parse {
             println!("Ast for {:?}:", file);

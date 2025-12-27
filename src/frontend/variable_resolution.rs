@@ -3,7 +3,7 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use crate::frontend::parser::{
+use crate::frontend::parse::{
     Ast, Block, BlockItem, Declaration, Expression, ForInit, Function, Statement, UnaryOp,
 };
 use anyhow::{Result, bail};
