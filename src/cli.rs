@@ -1,10 +1,11 @@
 use crate::backend::codegen;
+use crate::frontend::identifier_resolution;
 use crate::frontend::ir;
 use crate::frontend::label_resolution;
 use crate::frontend::lex;
 use crate::frontend::loop_resolution;
 use crate::frontend::parse;
-use crate::frontend::variable_resolution;
+use crate::frontend::type_check;
 use anyhow::Result;
 use anyhow::bail;
 use clap::Parser;
@@ -103,9 +104,10 @@ pub fn cli() -> Result<()> {
             continue;
         }
 
-        let analyzed_ast = variable_resolution::variable_resolution(ast)?;
+        let analyzed_ast = identifier_resolution::variable_resolution(ast)?;
         let analyzed_ast = label_resolution::label_resolution(analyzed_ast)?;
         let analyzed_ast = loop_resolution::loop_resolution(analyzed_ast)?;
+        let analyzed_ast = type_check::type_check(analyzed_ast)?;
 
         if args.validate {
             println!("Analyzed Ast for {:?}:", file);
@@ -141,6 +143,7 @@ pub fn cli() -> Result<()> {
 
     let output;
     if args.compile {
+        _ = binary_file.set_extension("o");
         output = Command::new("gcc")
             .arg("-c")
             .args(&asm_files)

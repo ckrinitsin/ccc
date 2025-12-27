@@ -8,12 +8,12 @@ use crate::frontend::parse;
 
 #[derive(Debug, PartialEq)]
 pub enum TAC {
-    Program(Function),
+    Program(Vec<Function>),
 }
 
 #[derive(Debug, PartialEq)]
 pub enum Function {
-    Function(String, Vec<Instruction>),
+    Function(String, Vec<String>, Vec<Instruction>),
 }
 
 #[derive(Debug, PartialEq)]
@@ -26,6 +26,7 @@ pub enum Instruction {
     JumpIfNotZero(Operand, String),
     Label(String),
     Ret(Operand),
+    FunctionCall(String, Vec<Operand>, Operand),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -66,7 +67,12 @@ pub enum BinOp {
 impl fmt::Display for TAC {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            TAC::Program(x) => write!(f, "{}", x),
+            TAC::Program(functions) => {
+                for func in functions {
+                    write!(f, "{}\n", func)?;
+                }
+                Ok(())
+            }
         }
     }
 }
@@ -74,8 +80,8 @@ impl fmt::Display for TAC {
 impl fmt::Display for Function {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Function::Function(name, body) => {
-                write!(f, "{}:\n", name)?;
+            Function::Function(name, params, body) => {
+                write!(f, "{} {:?}:\n", name, params)?;
                 for i in body {
                     write!(f, "  {}\n", i)?;
                 }
@@ -102,6 +108,9 @@ impl fmt::Display for Instruction {
                 write!(f, "JumpIfNotZero({}, {})", operand, label)
             }
             Instruction::Label(label) => write!(f, "\n{}:", label),
+            Instruction::FunctionCall(name, params, dst) => {
+                write!(f, "{} = Call({}, {:?})", dst, name, params)
+            }
         }
     }
 }
@@ -324,12 +333,23 @@ fn parse_expression(
 
             Ok(dst)
         }
+        parse::Expression::FunctionCall(name, expressions) => {
+            let dst = gen_temp();
+            let mut operands = Vec::new();
+            for expr in expressions {
+                operands.push(parse_expression(*expr, instructions)?);
+            }
+
+            instructions.push(Instruction::FunctionCall(name, operands, dst.clone()));
+
+            Ok(dst)
+        }
     }
 }
 
 fn parse_for_init(for_init: parse::ForInit, instructions: &mut Vec<Instruction>) -> Result<()> {
     match for_init {
-        parse::ForInit::D(declaration) => parse_declaration(declaration, instructions),
+        parse::ForInit::D(declaration) => parse_variable_declaration(declaration, instructions),
         parse::ForInit::E(opt_expression) => match opt_expression {
             Some(expression) => {
                 parse_expression(expression, instructions)?;
@@ -473,14 +493,25 @@ fn parse_statement(statement: parse::Statement, instructions: &mut Vec<Instructi
     }
 }
 
-fn parse_declaration(decl: parse::Declaration, instructions: &mut Vec<Instruction>) -> Result<()> {
+fn parse_variable_declaration(
+    decl: parse::VariableDeclaration,
+    instructions: &mut Vec<Instruction>,
+) -> Result<()> {
     match decl {
-        parse::Declaration::Declaration(_, None) => Ok(()),
-        parse::Declaration::Declaration(id, Some(expression)) => {
+        parse::VariableDeclaration::D(_, None) => Ok(()),
+        parse::VariableDeclaration::D(id, Some(expression)) => {
             let src = parse_expression(expression, instructions)?;
             instructions.push(Instruction::Copy(src, Operand::Variable(id)));
             Ok(())
         }
+    }
+}
+fn parse_declaration(decl: parse::Declaration, instructions: &mut Vec<Instruction>) -> Result<()> {
+    match decl {
+        parse::Declaration::V(variable_declaration) => {
+            parse_variable_declaration(variable_declaration, instructions)
+        }
+        parse::Declaration::F(_) => Ok(()),
     }
 }
 
@@ -502,13 +533,17 @@ fn parse_block(bl: parse::Block, instructions: &mut Vec<Instruction>) -> Result<
     }
 }
 
-fn parse_function(fun: parse::Function) -> Result<Function> {
+fn parse_function_declaration(fun: parse::FunctionDeclaration) -> Result<Option<Function>> {
     let mut instructions = Vec::new();
     match fun {
-        parse::Function::Function(name, body) => {
-            parse_block(body, &mut instructions)?;
-            instructions.push(Instruction::Ret(Operand::Constant(0)));
-            Ok(Function::Function(name, instructions))
+        parse::FunctionDeclaration::D(name, params, body) => {
+            if let Some(bl) = body {
+                parse_block(bl, &mut instructions)?;
+                instructions.push(Instruction::Ret(Operand::Constant(0)));
+                Ok(Some(Function::Function(name, params, instructions)))
+            } else {
+                Ok(None)
+            }
         }
     }
 }
@@ -517,6 +552,14 @@ pub fn lift_to_ir(prog: parse::Ast) -> Result<TAC> {
     COUNTER_TMP.store(0, Ordering::SeqCst);
     COUNTER_LABEL.store(0, Ordering::SeqCst);
     match prog {
-        parse::Ast::Program(fun) => Ok(TAC::Program(parse_function(fun)?)),
+        parse::Ast::Program(fun) => {
+            let mut result = Vec::new();
+            for f in fun {
+                if let Some(function) = parse_function_declaration(f)? {
+                    result.push(function);
+                }
+            }
+            Ok(TAC::Program(result))
+        }
     }
 }

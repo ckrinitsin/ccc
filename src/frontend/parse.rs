@@ -4,12 +4,7 @@ use std::collections::VecDeque;
 
 #[derive(Debug, PartialEq)]
 pub enum Ast {
-    Program(Function),
-}
-
-#[derive(Debug, PartialEq)]
-pub enum Function {
-    Function(String, Block),
+    Program(Vec<FunctionDeclaration>),
 }
 
 #[derive(Debug, PartialEq)]
@@ -25,7 +20,18 @@ pub enum BlockItem {
 
 #[derive(Debug, PartialEq)]
 pub enum Declaration {
-    Declaration(String, Option<Expression>),
+    V(VariableDeclaration),
+    F(FunctionDeclaration),
+}
+
+#[derive(Debug, PartialEq)]
+pub enum VariableDeclaration {
+    D(String, Option<Expression>),
+}
+
+#[derive(Debug, PartialEq)]
+pub enum FunctionDeclaration {
+    D(String, Vec<String>, Option<Block>),
 }
 
 #[derive(Debug, PartialEq)]
@@ -60,7 +66,7 @@ pub enum Statement {
 
 #[derive(Debug, PartialEq)]
 pub enum ForInit {
-    D(Declaration),
+    D(VariableDeclaration),
     E(Option<Expression>),
 }
 
@@ -75,6 +81,7 @@ pub enum Expression {
     PostIncr(Box<Expression>),
     PostDecr(Box<Expression>),
     Conditional(Box<Expression>, Box<Expression>, Box<Expression>),
+    FunctionCall(String, Vec<Box<Expression>>),
 }
 
 #[derive(Debug, PartialEq)]
@@ -255,13 +262,32 @@ fn parse_postfixes(tokens: &mut VecDeque<Token>, expr: Expression) -> Result<Exp
     }
 }
 
-/* factor ::= <unop> <factor> | <first_expr> <postfixes> */
+/* factor ::= <unop> <factor> | <first_expr> <postfixes>
+ *  | <identifier> "(" [ <exp> { "," <exp> } ] ")" */
 fn parse_factor(tokens: &mut VecDeque<Token>) -> Result<Expression> {
-    match &tokens[0] {
-        Token::Complement | Token::Negation | Token::Not | Token::Increment | Token::Decrement => {
+    match (&tokens[0], &tokens[1]) {
+        (Token::Complement, _)
+        | (Token::Negation, _)
+        | (Token::Not, _)
+        | (Token::Increment, _)
+        | (Token::Decrement, _) => {
             let unop = parse_unop(tokens)?;
             let expr = parse_factor(tokens)?;
             Ok(Expression::Unary(unop, Box::new(expr)))
+        }
+        (Token::Identifier(_), Token::OpenParanthesis) => {
+            let id = parse_identifier(tokens)?;
+            expect_token(Token::OpenParanthesis, tokens.pop_front())?;
+            let mut args = Vec::new();
+            while tokens[0] != Token::CloseParanthesis {
+                if tokens[0] == Token::Comma {
+                    expect_token(Token::Comma, tokens.pop_front())?;
+                }
+                args.push(Box::new(parse_expression(tokens, 0)?));
+            }
+            expect_token(Token::CloseParanthesis, tokens.pop_front())?;
+
+            Ok(Expression::FunctionCall(id, args))
         }
         _ => {
             let expr = parse_first_expr(tokens)?;
@@ -271,7 +297,7 @@ fn parse_factor(tokens: &mut VecDeque<Token>) -> Result<Expression> {
 }
 
 /* expression ::= <factor> | <expression> <binop> <expression>
- *  | <expression> "?" <expression> ":" <expression>*/
+ *  | <expression> "?" <expression> ":" <expression> */
 fn parse_expression(tokens: &mut VecDeque<Token>, order: usize) -> Result<Expression> {
     let mut left = parse_factor(tokens)?;
     while lex::is_binary(&tokens[0]) && lex::precedence(&tokens[0]) >= order {
@@ -301,7 +327,7 @@ fn parse_expression(tokens: &mut VecDeque<Token>, order: usize) -> Result<Expres
 /* for_init ::= <declaration> | [ <expression> ] ";" */
 fn parse_for_init(tokens: &mut VecDeque<Token>) -> Result<ForInit> {
     match &tokens[0] {
-        Token::Int => Ok(ForInit::D(parse_declaration(tokens)?)),
+        Token::Int => Ok(ForInit::D(parse_variable_declaration(tokens)?)),
         Token::Semicolon => {
             expect_token(Token::Semicolon, tokens.pop_front())?;
             Ok(ForInit::E(None))
@@ -453,19 +479,30 @@ fn parse_statement(tokens: &mut VecDeque<Token>) -> Result<Statement> {
     }
 }
 
-/* declaration ::= "int" <identifier> [ "=" <expression> ] ";" */
-fn parse_declaration(tokens: &mut VecDeque<Token>) -> Result<Declaration> {
+/* variable_declaration ::= "int" <identifier> [ "=" <expression> ] ";" */
+fn parse_variable_declaration(tokens: &mut VecDeque<Token>) -> Result<VariableDeclaration> {
     expect_token(Token::Int, tokens.pop_front())?;
     let id = parse_identifier(tokens)?;
     match tokens.pop_front() {
         Some(Token::Assignment) => {
             let expression = parse_expression(tokens, 0)?;
             expect_token(Token::Semicolon, tokens.pop_front())?;
-            Ok(Declaration::Declaration(id, Some(expression)))
+            Ok(VariableDeclaration::D(id, Some(expression)))
         }
-        Some(Token::Semicolon) => Ok(Declaration::Declaration(id, None)),
+        Some(Token::Semicolon) => Ok(VariableDeclaration::D(id, None)),
         Some(x) => bail!("Broken declaration: got {}", x),
         None => bail!("Broken declaration: end of file"),
+    }
+}
+
+/* declaration ::= variable_declaration | function_declaration */
+fn parse_declaration(tokens: &mut VecDeque<Token>) -> Result<Declaration> {
+    match &tokens[2] {
+        Token::OpenParanthesis => Ok(Declaration::F(parse_function_declaration(tokens)?)),
+        Token::Assignment | Token::Semicolon => {
+            Ok(Declaration::V(parse_variable_declaration(tokens)?))
+        }
+        x => bail!("Expected variable or function declaration, got {}", x),
     }
 }
 
@@ -488,23 +525,54 @@ fn parse_block(tokens: &mut VecDeque<Token>) -> Result<Block> {
     Ok(Block::B(body))
 }
 
-/* function ::= "int" <identifier> "(" "void" ")" <block> */
-fn parse_function(tokens: &mut VecDeque<Token>) -> Result<Function> {
+/* param-list ::= "void" | "int" <identifier> { "," "int" <identifier> } */
+fn parse_param_list(tokens: &mut VecDeque<Token>) -> Result<Vec<String>> {
+    match &tokens[0] {
+        Token::Void => {
+            expect_token(Token::Void, tokens.pop_front())?;
+            Ok(Vec::new())
+        }
+        Token::Int => {
+            expect_token(Token::Int, tokens.pop_front())?;
+            let mut result = Vec::new();
+            result.push(parse_identifier(tokens)?);
+            while tokens[0] == Token::Comma {
+                expect_token(Token::Comma, tokens.pop_front())?;
+                expect_token(Token::Int, tokens.pop_front())?;
+                result.push(parse_identifier(tokens)?);
+            }
+            Ok(result)
+        }
+        x => bail!("Wrong token in parameter list: {}", x),
+    }
+}
+
+/* function_declaration ::= "int" <identifier> "(" <param-list> ")" ( <block> | ";" ) */
+fn parse_function_declaration(tokens: &mut VecDeque<Token>) -> Result<FunctionDeclaration> {
     expect_token(Token::Int, tokens.pop_front())?;
     let id = parse_identifier(tokens)?;
     expect_token(Token::OpenParanthesis, tokens.pop_front())?;
-    expect_token(Token::Void, tokens.pop_front())?;
+    let param_list = parse_param_list(tokens)?;
     expect_token(Token::CloseParanthesis, tokens.pop_front())?;
-    let block = parse_block(tokens)?;
-    Ok(Function::Function(id, block))
+    let block = match &tokens[0] {
+        Token::Semicolon => {
+            expect_token(Token::Semicolon, tokens.pop_front())?;
+            None
+        }
+        _ => Some(parse_block(tokens)?),
+    };
+    Ok(FunctionDeclaration::D(id, param_list, block))
 }
 
-/* program ::= <function> */
+/* program ::= { <function-declaration> } */
 pub fn parse_tokens(mut tokens: VecDeque<Token>) -> Result<Ast> {
-    let result = Ast::Program(parse_function(&mut tokens)?);
+    let mut result = Vec::new();
+    while tokens.len() > 0 && matches!(tokens[0], Token::Int) {
+        result.push(parse_function_declaration(&mut tokens)?);
+    }
 
     match tokens.pop_front() {
         Some(x) => bail!("Expected end of code but found {}", x),
-        None => Ok(result),
+        None => Ok(Ast::Program(result)),
     }
 }

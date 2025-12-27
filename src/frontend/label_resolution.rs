@@ -3,7 +3,7 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use crate::frontend::parse::{Ast, Block, BlockItem, Function, Statement};
+use crate::frontend::parse::{Ast, Block, BlockItem, FunctionDeclaration, Statement};
 use anyhow::{Result, bail};
 
 fn gen_label(id: String) -> String {
@@ -184,13 +184,18 @@ fn resolve_label_block(block: Block, hash_map: &mut HashMap<String, String>) -> 
     }
 }
 
-fn resolve_label_function(func: Function) -> Result<Function> {
-    let mut hash_map: HashMap<String, String> = HashMap::new();
+fn resolve_label_function_declaration(
+    func: FunctionDeclaration,
+    hash_map: &mut HashMap<String, String>,
+) -> Result<FunctionDeclaration> {
     match func {
-        Function::Function(x, block) => {
-            let block = resolve_label_block(block, &mut hash_map)?;
-            let block = resolve_goto_block(block, &mut hash_map)?;
-            Ok(Function::Function(x, block))
+        FunctionDeclaration::D(name, args, block) => {
+            let Some(bl) = block else {
+                return Ok(FunctionDeclaration::D(name, args, block));
+            };
+            let block = resolve_label_block(bl, hash_map)?;
+            let block = Some(resolve_goto_block(block, hash_map)?);
+            Ok(FunctionDeclaration::D(name, args, block))
         }
     }
 }
@@ -199,7 +204,15 @@ static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 pub fn label_resolution(ast: Ast) -> Result<Ast> {
     COUNTER.store(0, Ordering::SeqCst);
+
     match ast {
-        Ast::Program(function) => Ok(Ast::Program(resolve_label_function(function)?)),
+        Ast::Program(functions) => {
+            let mut funcs = Vec::new();
+            for func in functions {
+                let mut hash_map: HashMap<String, String> = HashMap::new();
+                funcs.push(resolve_label_function_declaration(func, &mut hash_map)?);
+            }
+            Ok(Ast::Program(funcs))
+        }
     }
 }
