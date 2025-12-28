@@ -5,8 +5,8 @@ impl fmt::Display for Asm {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Asm::Program(x) => {
-                for func in x {
-                    write!(f, "{}\n", func)?;
+                for top_level in x {
+                    write!(f, "{}\n", top_level)?;
                 }
                 write!(f, ".section .note.GNU-stack,\"\",@progbits")
             }
@@ -14,19 +14,40 @@ impl fmt::Display for Asm {
     }
 }
 
-impl fmt::Display for Function {
+fn write_global(f: &mut fmt::Formatter, name: &String, global: bool) -> fmt::Result {
+    if global {
+        write!(f, "  .globl {}\n", name)?;
+    }
+    Ok(())
+}
+
+fn write_alignment(f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "  .align 4\n")
+}
+
+impl fmt::Display for TopLevel {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Function::Function(name, body) => {
-                write!(
-                    f,
-                    "  .globl {}\n{}:\n  pushq %rbp\n  movq %rsp, %rbp\n",
-                    name, name
-                )?;
+            TopLevel::Function(name, global, body) => {
+                write_global(f, name, *global)?;
+                write!(f, "  .text\n{}:\n  pushq %rbp\n  movq %rsp, %rbp\n", name)?;
                 for i in body {
                     write!(f, "  {}\n", i)?;
                 }
                 Ok(())
+            }
+            TopLevel::StaticVariable(name, global, init) => {
+                if *init == 0 {
+                    write_global(f, name, *global)?;
+                    write!(f, "  .bss\n")?;
+                    write_alignment(f)?;
+                    write!(f, "{}:\n  .zero 4\n", name)
+                } else {
+                    write_global(f, name, *global)?;
+                    write!(f, "  .data\n")?;
+                    write_alignment(f)?;
+                    write!(f, "{}:\n  .long {}\n", name, init)
+                }
             }
         }
     }
@@ -68,6 +89,7 @@ impl fmt::Display for Operand {
             Operand::Register(reg) => write!(f, "%{}", reg),
             Operand::Pseudo(x) => write!(f, "PSEUDO {}", x),
             Operand::Stack(x) => write!(f, "{}(%rbp)", x),
+            Operand::Data(x) => write!(f, "{}(%rip)", x),
         }
     }
 }

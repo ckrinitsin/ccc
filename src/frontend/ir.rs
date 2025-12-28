@@ -1,19 +1,24 @@
 use anyhow::{Result, bail};
 use std::{
+    collections::HashMap,
     fmt,
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use crate::frontend::parse;
+use crate::frontend::{
+    parse,
+    type_check::{IdentifierAttributes, Type},
+};
 
 #[derive(Debug, PartialEq)]
 pub enum TAC {
-    Program(Vec<Function>),
+    Program(Vec<TopLevel>),
 }
 
 #[derive(Debug, PartialEq)]
-pub enum Function {
-    Function(String, Vec<String>, Vec<Instruction>),
+pub enum TopLevel {
+    Function(String, bool, Vec<String>, Vec<Instruction>),
+    StaticVariable(String, bool, i32 /* name, global, init_value */),
 }
 
 #[derive(Debug, PartialEq)]
@@ -77,16 +82,17 @@ impl fmt::Display for TAC {
     }
 }
 
-impl fmt::Display for Function {
+impl fmt::Display for TopLevel {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Function::Function(name, params, body) => {
+            TopLevel::Function(name, params, body, _) => {
                 write!(f, "{} {:?}:\n", name, params)?;
                 for i in body {
                     write!(f, "  {}\n", i)?;
                 }
                 Ok(())
             }
+            TopLevel::StaticVariable(name, _, val) => write!(f, "glob {} = {}", name, val),
         }
     }
 }
@@ -238,7 +244,7 @@ fn parse_expression(
             } else {
                 instructions.push(Instruction::JumpIfNotZero(src1, label.clone()));
             }
-
+            // TODO: try to remove the clones (references in enum?)
             let src2 = parse_expression(*expression2, instructions)?;
             if binary_op == parse::BinaryOp::LAnd {
                 instructions.push(Instruction::JumpIfZero(src2, label.clone()));
@@ -498,14 +504,18 @@ fn parse_variable_declaration(
     instructions: &mut Vec<Instruction>,
 ) -> Result<()> {
     match decl {
-        parse::VariableDeclaration::D(_, None) => Ok(()),
-        parse::VariableDeclaration::D(id, Some(expression)) => {
-            let src = parse_expression(expression, instructions)?;
-            instructions.push(Instruction::Copy(src, Operand::Variable(id)));
+        parse::VariableDeclaration::D(id, opt_expression, storage_class) => {
+            if storage_class == None
+                && let Some(expression) = opt_expression
+            {
+                let src = parse_expression(expression, instructions)?;
+                instructions.push(Instruction::Copy(src, Operand::Variable(id)));
+            }
             Ok(())
         }
     }
 }
+
 fn parse_declaration(decl: parse::Declaration, instructions: &mut Vec<Instruction>) -> Result<()> {
     match decl {
         parse::Declaration::V(variable_declaration) => {
@@ -533,14 +543,29 @@ fn parse_block(bl: parse::Block, instructions: &mut Vec<Instruction>) -> Result<
     }
 }
 
-fn parse_function_declaration(fun: parse::FunctionDeclaration) -> Result<Option<Function>> {
+fn parse_function_declaration(
+    fun: parse::FunctionDeclaration,
+    symbol_table: &HashMap<String, (Type, IdentifierAttributes)>,
+) -> Result<Option<TopLevel>> {
     let mut instructions = Vec::new();
     match fun {
-        parse::FunctionDeclaration::D(name, params, body) => {
+        parse::FunctionDeclaration::D(name, params, body, _) => {
             if let Some(bl) = body {
                 parse_block(bl, &mut instructions)?;
                 instructions.push(Instruction::Ret(Operand::Constant(0)));
-                Ok(Some(Function::Function(name, params, instructions)))
+
+                // TODO: write symbol_table util functions (is_global, is_static...)
+                let global = match symbol_table.get(&name) {
+                    Some((_, IdentifierAttributes::FunctionAttributes(_, glob))) => glob,
+                    _ => bail!("Function declarations should be in symbol table"),
+                };
+
+                Ok(Some(TopLevel::Function(
+                    name,
+                    *global,
+                    params,
+                    instructions,
+                )))
             } else {
                 Ok(None)
             }
@@ -548,17 +573,51 @@ fn parse_function_declaration(fun: parse::FunctionDeclaration) -> Result<Option<
     }
 }
 
-pub fn lift_to_ir(prog: parse::Ast) -> Result<TAC> {
+fn convert_symbols_to_ir(
+    symbol_table: &HashMap<String, (Type, IdentifierAttributes)>,
+) -> Result<Vec<TopLevel>> {
+    let mut result = Vec::new();
+    for (name, (_, id_attr)) in symbol_table {
+        match id_attr {
+            IdentifierAttributes::StaticAttributes(initial_value, global) => match initial_value {
+                super::type_check::InitialValue::Tentative => {
+                    result.push(TopLevel::StaticVariable(name.clone(), *global, 0))
+                }
+                super::type_check::InitialValue::Initial(i) => {
+                    result.push(TopLevel::StaticVariable(name.clone(), *global, *i))
+                }
+                super::type_check::InitialValue::NoInit => (),
+            },
+            _ => (),
+        }
+    }
+
+    Ok(result)
+}
+
+pub fn lift_to_ir(
+    prog: parse::Ast,
+    symbol_table: &HashMap<String, (Type, IdentifierAttributes)>,
+) -> Result<TAC> {
     COUNTER_TMP.store(0, Ordering::SeqCst);
     COUNTER_LABEL.store(0, Ordering::SeqCst);
     match prog {
-        parse::Ast::Program(fun) => {
-            let mut result = Vec::new();
-            for f in fun {
-                if let Some(function) = parse_function_declaration(f)? {
-                    result.push(function);
+        parse::Ast::Program(functions) => {
+            let mut top_level_ir = Vec::new();
+            for func in functions {
+                match func {
+                    parse::Declaration::V(_) => (),
+                    parse::Declaration::F(function_declaration) => {
+                        if let Some(function) =
+                            parse_function_declaration(function_declaration, symbol_table)?
+                        {
+                            top_level_ir.push(function);
+                        }
+                    }
                 }
             }
+            let mut result = convert_symbols_to_ir(symbol_table)?;
+            result.append(&mut top_level_ir);
             Ok(TAC::Program(result))
         }
     }

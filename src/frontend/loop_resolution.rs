@@ -3,7 +3,9 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use crate::frontend::parse::{Ast, Block, BlockItem, Expression, FunctionDeclaration, Statement};
+use crate::frontend::parse::{
+    Ast, Block, BlockItem, Declaration, Expression, FunctionDeclaration, Statement,
+};
 use anyhow::{Result, bail};
 
 fn gen_label(id: String) -> String {
@@ -225,18 +227,29 @@ fn resolve_loop_block(
     }
 }
 
-fn resolve_loop_function_declaration(
-    func: FunctionDeclaration,
+fn resolve_loop_declaration(
+    decl: Declaration,
     hash_map: &mut HashMap<String, String>,
-) -> Result<FunctionDeclaration> {
-    match func {
-        FunctionDeclaration::D(name, args, block) => {
+) -> Result<Declaration> {
+    match decl {
+        Declaration::F(FunctionDeclaration::D(name, args, block, storage_class)) => {
             let Some(bl) = block else {
-                return Ok(FunctionDeclaration::D(name, args, block));
+                return Ok(Declaration::F(FunctionDeclaration::D(
+                    name,
+                    args,
+                    block,
+                    storage_class,
+                )));
             };
             let block = Some(resolve_loop_block(bl, hash_map, None, None, &mut None)?);
-            Ok(FunctionDeclaration::D(name, args, block))
+            Ok(Declaration::F(FunctionDeclaration::D(
+                name,
+                args,
+                block,
+                storage_class,
+            )))
         }
+        x => Ok(x),
     }
 }
 
@@ -250,7 +263,7 @@ pub fn loop_resolution(ast: Ast) -> Result<Ast> {
             let mut funcs = Vec::new();
             for func in functions {
                 let mut hash_map: HashMap<String, String> = HashMap::new();
-                funcs.push(resolve_loop_function_declaration(func, &mut hash_map)?);
+                funcs.push(resolve_loop_declaration(func, &mut hash_map)?);
             }
             Ok(Ast::Program(funcs))
         }

@@ -62,6 +62,8 @@ pub enum Token {
     Switch,
     Case,
     Default,
+    Static,
+    Extern,
 }
 
 impl Token {
@@ -110,6 +112,8 @@ impl Token {
             (Regex::new(r"\;").unwrap(), |_| Token::Semicolon),
             (Regex::new(r"return\b").unwrap(), |_| Token::Return),
             (Regex::new(r"void\b").unwrap(), |_| Token::Void),
+            (Regex::new(r"static\b").unwrap(), |_| Token::Static),
+            (Regex::new(r"extern\b").unwrap(), |_| Token::Extern),
             (Regex::new(r"int\b").unwrap(), |_| Token::Int),
             (Regex::new(r"if\b").unwrap(), |_| Token::If),
             (Regex::new(r"do\b").unwrap(), |_| Token::Do),
@@ -195,6 +199,9 @@ impl fmt::Display for Token {
             Token::Switch => write!(f, "switch"),
             Token::Case => write!(f, "case"),
             Token::Default => write!(f, "default"),
+
+            Token::Static => write!(f, "static"),
+            Token::Extern => write!(f, "extern"),
         }
     }
 }

@@ -107,7 +107,7 @@ pub fn cli() -> Result<()> {
         let analyzed_ast = identifier_resolution::variable_resolution(ast)?;
         let analyzed_ast = label_resolution::label_resolution(analyzed_ast)?;
         let analyzed_ast = loop_resolution::loop_resolution(analyzed_ast)?;
-        let analyzed_ast = type_check::type_check(analyzed_ast)?;
+        let (analyzed_ast, symbol_table) = type_check::type_check(analyzed_ast)?;
 
         if args.validate {
             println!("Analyzed Ast for {:?}:", file);
@@ -115,7 +115,7 @@ pub fn cli() -> Result<()> {
             continue;
         }
 
-        let ir = ir::lift_to_ir(analyzed_ast)?;
+        let ir = ir::lift_to_ir(analyzed_ast, &symbol_table)?;
 
         if args.tacky {
             println!("IR for {:?}:", file);
@@ -123,7 +123,7 @@ pub fn cli() -> Result<()> {
             continue;
         }
 
-        let asm = codegen::gen_asm(ir)?;
+        let asm = codegen::gen_asm(ir, &symbol_table)?;
 
         if args.codegen {
             println!("Codegen for {:?}:", file);

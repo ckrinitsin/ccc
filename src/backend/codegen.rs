@@ -1,16 +1,18 @@
 use crate::frontend::ir;
+use crate::frontend::type_check::{IdentifierAttributes, Type};
 use anyhow::{Result, bail};
 use std::cmp::min;
 use std::collections::HashMap;
 
 #[derive(Debug, PartialEq)]
 pub enum Asm {
-    Program(Vec<Function>),
+    Program(Vec<TopLevel>),
 }
 
 #[derive(Debug, PartialEq)]
-pub enum Function {
-    Function(String, Vec<Instruction>),
+pub enum TopLevel {
+    Function(String, bool, Vec<Instruction>),
+    StaticVariable(String, bool, i32),
 }
 
 #[derive(Debug, PartialEq)]
@@ -38,6 +40,7 @@ pub enum Operand {
     Register(Reg),
     Pseudo(String),
     Stack(i32),
+    Data(String),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -289,9 +292,9 @@ fn parse_instructions(instructions: Vec<ir::Instruction>) -> Result<Vec<Instruct
     Ok(result)
 }
 
-fn parse_function(fun: ir::Function) -> Result<Function> {
+fn parse_function(fun: ir::TopLevel) -> Result<TopLevel> {
     match fun {
-        ir::Function::Function(name, params, body) => {
+        ir::TopLevel::Function(name, global, params, body) => {
             let reg_args_mapping = vec![Reg::RDI, Reg::RSI, Reg::RDX, Reg::RCX, Reg::R8, Reg::R9];
             let mut instructions: Vec<Instruction> = Vec::new();
             let mut index = 0;
@@ -316,7 +319,10 @@ fn parse_function(fun: ir::Function) -> Result<Function> {
             }
 
             instructions.append(&mut parse_instructions(body)?);
-            Ok(Function::Function(name, instructions))
+            Ok(TopLevel::Function(name, global, instructions))
+        }
+        ir::TopLevel::StaticVariable(name, global, init) => {
+            Ok(TopLevel::StaticVariable(name, global, init))
         }
     }
 }
@@ -324,11 +330,21 @@ fn parse_function(fun: ir::Function) -> Result<Function> {
 fn replace_pseudo_operand(
     operand: Operand,
     hash_map: &mut HashMap<String, i32>,
+    symbol_table: &HashMap<String, (Type, IdentifierAttributes)>,
 ) -> Result<Operand> {
     match operand {
         Operand::Pseudo(key) => match hash_map.get(&key) {
             Some(x) => Ok(Operand::Stack(*x)),
             None => {
+                if let Some((_, symb_attr)) = symbol_table.get(&key) {
+                    match symb_attr {
+                        IdentifierAttributes::StaticAttributes(_, _) => {
+                            return Ok(Operand::Data(key));
+                        }
+                        _ => (),
+                    };
+                }
+
                 let n_val = match hash_map.iter().min_by_key(|entry| entry.1) {
                     Some(x) => x.1 - 4,
                     None => -4,
@@ -341,64 +357,77 @@ fn replace_pseudo_operand(
     }
 }
 
-fn replace_pseudo(asm: Asm) -> Result<Asm> {
+fn replace_pseudo(
+    asm: Asm,
+    symbol_table: &HashMap<String, (Type, IdentifierAttributes)>,
+) -> Result<Asm> {
     let mut new_instructions = Vec::new();
     match asm {
         Asm::Program(functions) => {
             for function in functions {
                 let mut instr_pseudoless: Vec<Instruction> = Vec::new();
                 let mut hash_map: HashMap<String, i32> = HashMap::new();
-                let function_name;
                 match function {
-                    Function::Function(name, instructions) => {
-                        function_name = name;
+                    TopLevel::Function(name, global, instructions) => {
                         for instr in instructions {
                             match instr {
                                 Instruction::Mov(op1, op2) => {
-                                    let n_op1 = replace_pseudo_operand(op1, &mut hash_map)?;
-                                    let n_op2 = replace_pseudo_operand(op2, &mut hash_map)?;
+                                    let n_op1 =
+                                        replace_pseudo_operand(op1, &mut hash_map, symbol_table)?;
+                                    let n_op2 =
+                                        replace_pseudo_operand(op2, &mut hash_map, symbol_table)?;
                                     instr_pseudoless.push(Instruction::Mov(n_op1, n_op2));
                                 }
                                 Instruction::Cmp(op1, op2) => {
-                                    let n_op1 = replace_pseudo_operand(op1, &mut hash_map)?;
-                                    let n_op2 = replace_pseudo_operand(op2, &mut hash_map)?;
+                                    let n_op1 =
+                                        replace_pseudo_operand(op1, &mut hash_map, symbol_table)?;
+                                    let n_op2 =
+                                        replace_pseudo_operand(op2, &mut hash_map, symbol_table)?;
                                     instr_pseudoless.push(Instruction::Cmp(n_op1, n_op2));
                                 }
                                 Instruction::Unary(un_op, op) => {
-                                    let n_op = replace_pseudo_operand(op, &mut hash_map)?;
+                                    let n_op =
+                                        replace_pseudo_operand(op, &mut hash_map, symbol_table)?;
                                     instr_pseudoless.push(Instruction::Unary(un_op, n_op));
                                 }
                                 Instruction::SetCC(cond, op) => {
-                                    let n_op = replace_pseudo_operand(op, &mut hash_map)?;
+                                    let n_op =
+                                        replace_pseudo_operand(op, &mut hash_map, symbol_table)?;
                                     instr_pseudoless.push(Instruction::SetCC(cond, n_op));
                                 }
                                 Instruction::Binary(bin_op, op1, op2) => {
-                                    let n_op1 = replace_pseudo_operand(op1, &mut hash_map)?;
-                                    let n_op2 = replace_pseudo_operand(op2, &mut hash_map)?;
+                                    let n_op1 =
+                                        replace_pseudo_operand(op1, &mut hash_map, symbol_table)?;
+                                    let n_op2 =
+                                        replace_pseudo_operand(op2, &mut hash_map, symbol_table)?;
                                     instr_pseudoless
                                         .push(Instruction::Binary(bin_op, n_op1, n_op2));
                                 }
                                 Instruction::Idiv(op) => {
-                                    let n_op = replace_pseudo_operand(op, &mut hash_map)?;
+                                    let n_op =
+                                        replace_pseudo_operand(op, &mut hash_map, symbol_table)?;
                                     instr_pseudoless.push(Instruction::Idiv(n_op));
                                 }
                                 Instruction::Push(op) => {
-                                    let n_op = replace_pseudo_operand(op, &mut hash_map)?;
+                                    let n_op =
+                                        replace_pseudo_operand(op, &mut hash_map, symbol_table)?;
                                     instr_pseudoless.push(Instruction::Push(n_op));
                                 }
                                 x => instr_pseudoless.push(x),
                             }
                         }
+
+                        match hash_map.iter().min_by_key(|entry| entry.1) {
+                            Some(x) => {
+                                let padded = (-*x.1 + 15) / 16 * 16;
+                                instr_pseudoless.insert(0, Instruction::AllocStack(padded));
+                            }
+                            None => (),
+                        };
+                        new_instructions.push(TopLevel::Function(name, global, instr_pseudoless));
                     }
+                    static_variable => new_instructions.push(static_variable),
                 }
-                match hash_map.iter().min_by_key(|entry| entry.1) {
-                    Some(x) => {
-                        let padded = (-*x.1 + 15) / 16 * 16;
-                        instr_pseudoless.insert(0, Instruction::AllocStack(padded));
-                    }
-                    None => (),
-                };
-                new_instructions.push(Function::Function(function_name, instr_pseudoless));
             }
         }
     }
@@ -407,21 +436,19 @@ fn replace_pseudo(asm: Asm) -> Result<Asm> {
 
 fn is_mem_access(op: &Operand) -> bool {
     match op {
-        Operand::Stack(_) => true,
+        Operand::Stack(_) | Operand::Data(_) => true,
         _ => false,
     }
 }
 
 fn fix_mem_accesses(asm: Asm) -> Result<Asm> {
-    let mut new_functions: Vec<Function> = Vec::new();
+    let mut new_functions: Vec<TopLevel> = Vec::new();
     match asm {
         Asm::Program(functions) => {
             for function in functions {
-                let function_name;
                 let mut new_instr: Vec<Instruction> = Vec::new();
                 match function {
-                    Function::Function(name, instructions) => {
-                        function_name = name;
+                    TopLevel::Function(name, global, instructions) => {
                         for instr in instructions {
                             match instr {
                                 Instruction::Mov(op1, op2) => {
@@ -506,16 +533,20 @@ fn fix_mem_accesses(asm: Asm) -> Result<Asm> {
                                 x => new_instr.push(x),
                             }
                         }
+                        new_functions.push(TopLevel::Function(name, global, new_instr));
                     }
+                    static_variable => new_functions.push(static_variable),
                 }
-                new_functions.push(Function::Function(function_name, new_instr));
             }
         }
     }
     Ok(Asm::Program(new_functions))
 }
 
-pub fn gen_asm(prog: ir::TAC) -> Result<Asm> {
+pub fn gen_asm(
+    prog: ir::TAC,
+    symbol_table: &HashMap<String, (Type, IdentifierAttributes)>,
+) -> Result<Asm> {
     let mut asm = match prog {
         ir::TAC::Program(fun) => {
             let mut functions = Vec::new();
@@ -526,7 +557,7 @@ pub fn gen_asm(prog: ir::TAC) -> Result<Asm> {
         }
     };
 
-    asm = replace_pseudo(asm)?;
+    asm = replace_pseudo(asm, symbol_table)?;
 
     asm = fix_mem_accesses(asm)?;
 

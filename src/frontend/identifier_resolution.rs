@@ -5,13 +5,14 @@ use std::{
 
 use crate::frontend::parse::{
     Ast, Block, BlockItem, Declaration, Expression, ForInit, FunctionDeclaration, Statement,
-    UnaryOp, VariableDeclaration,
+    StorageClass, UnaryOp, VariableDeclaration,
 };
 use anyhow::{Result, bail};
 
+// TODO: refactor to one global counter, don't use multiple dots and different counters
 fn gen_temp_local(id: String) -> String {
     let counter = COUNTER.fetch_add(1, Ordering::SeqCst);
-    id + ":" + &counter.to_string()
+    id + "...." + &counter.to_string()
 }
 
 fn copy_hashmap(
@@ -128,7 +129,7 @@ fn resolve_for_init(
     hash_map: &mut HashMap<String, (String, bool, bool)>,
 ) -> Result<ForInit> {
     match for_init {
-        ForInit::D(declaration) => Ok(ForInit::D(resolve_variable_declaration(
+        ForInit::D(declaration) => Ok(ForInit::D(resolve_local_variable_declaration(
             declaration,
             hash_map,
         )?)),
@@ -217,18 +218,32 @@ fn resolve_statement(
     }
 }
 
-fn resolve_variable_declaration(
+fn resolve_local_variable_declaration(
     decl: VariableDeclaration,
     hash_map: &mut HashMap<String, (String, bool, bool)>,
 ) -> Result<VariableDeclaration> {
     match decl {
-        VariableDeclaration::D(id, opt_expression) => {
-            let unique = resolve_identifier_declaration(id, hash_map)?;
+        VariableDeclaration::D(id, opt_expression, storage_class) => {
+            if let Some(prev_entry) = hash_map.get(&id) {
+                if prev_entry.1
+                    && !(prev_entry.2 && matches!(storage_class, Some(StorageClass::Extern)))
+                {
+                    bail!("Conflicting local declarations");
+                }
+            }
+
+            if matches!(storage_class, Some(StorageClass::Extern)) {
+                hash_map.insert(id.clone(), (id.clone(), true, true));
+                return Ok(VariableDeclaration::D(id, opt_expression, storage_class));
+            }
+
+            let unique = gen_temp_local(id.clone());
+            hash_map.insert(id, (unique.clone(), true, false));
             if let Some(expr) = opt_expression {
                 let expr = resolve_expression(expr, hash_map)?;
-                return Ok(VariableDeclaration::D(unique, Some(expr)));
+                return Ok(VariableDeclaration::D(unique, Some(expr), storage_class));
             }
-            Ok(VariableDeclaration::D(unique, None))
+            Ok(VariableDeclaration::D(unique, None, storage_class))
         }
     }
 }
@@ -245,12 +260,24 @@ fn resolve_identifier_declaration(
     Ok(unique)
 }
 
-fn resolve_function_declaration(
+fn resolve_file_scope_variable_declaration(
+    decl: VariableDeclaration,
+    hash_map: &mut HashMap<String, (String, bool, bool)>,
+) -> Result<VariableDeclaration> {
+    match decl {
+        VariableDeclaration::D(id, opt_expression, storage_class) => {
+            hash_map.insert(id.clone(), (id.clone(), true, true));
+            Ok(VariableDeclaration::D(id, opt_expression, storage_class))
+        }
+    }
+}
+
+fn resolve_file_scope_function_declaration(
     decl: FunctionDeclaration,
     hash_map: &mut HashMap<String, (String, bool, bool)>,
 ) -> Result<FunctionDeclaration> {
     match decl {
-        FunctionDeclaration::D(name, params, block) => {
+        FunctionDeclaration::D(name, params, block, storage_class) => {
             if hash_map.contains_key(&name)
                 && hash_map.get(&name).unwrap().1
                 && !hash_map.get(&name).unwrap().2
@@ -270,7 +297,12 @@ fn resolve_function_declaration(
                 new_block = Some(resolve_block(bl, &mut inner_map)?);
             }
 
-            Ok(FunctionDeclaration::D(name, new_params, new_block))
+            Ok(FunctionDeclaration::D(
+                name,
+                new_params,
+                new_block,
+                storage_class,
+            ))
         }
     }
 }
@@ -280,28 +312,16 @@ fn resolve_local_function_declaration(
     hash_map: &mut HashMap<String, (String, bool, bool)>,
 ) -> Result<FunctionDeclaration> {
     match &decl {
-        FunctionDeclaration::D(_, _, block) => {
+        FunctionDeclaration::D(_, _, block, storage_class) => {
             if *block != None {
                 bail!("Function definition inside another function is not allowed!");
             }
+            if matches!(storage_class, Some(StorageClass::Static)) {
+                bail!("Static in block scope function is not allowed");
+            }
         }
     }
-    resolve_function_declaration(decl, hash_map)
-}
-
-fn resolve_declaration(
-    decl: Declaration,
-    hash_map: &mut HashMap<String, (String, bool, bool)>,
-) -> Result<Declaration> {
-    match decl {
-        Declaration::V(variable_declaration) => Ok(Declaration::V(resolve_variable_declaration(
-            variable_declaration,
-            hash_map,
-        )?)),
-        Declaration::F(function_declaration) => Ok(Declaration::F(
-            resolve_local_function_declaration(function_declaration, hash_map)?,
-        )),
-    }
+    resolve_file_scope_function_declaration(decl, hash_map)
 }
 
 fn resolve_block_item(
@@ -310,7 +330,10 @@ fn resolve_block_item(
 ) -> Result<BlockItem> {
     match item {
         BlockItem::S(statement) => Ok(BlockItem::S(resolve_statement(statement, hash_map)?)),
-        BlockItem::D(declaration) => Ok(BlockItem::D(resolve_declaration(declaration, hash_map)?)),
+        BlockItem::D(declaration) => Ok(BlockItem::D(resolve_local_declaration(
+            declaration,
+            hash_map,
+        )?)),
     }
 }
 
@@ -329,6 +352,34 @@ fn resolve_block(
     }
 }
 
+fn resolve_local_declaration(
+    decl: Declaration,
+    hash_map: &mut HashMap<String, (String, bool, bool)>,
+) -> Result<Declaration> {
+    match decl {
+        Declaration::V(variable_declaration) => Ok(Declaration::V(
+            resolve_local_variable_declaration(variable_declaration, hash_map)?,
+        )),
+        Declaration::F(function_declaration) => Ok(Declaration::F(
+            resolve_local_function_declaration(function_declaration, hash_map)?,
+        )),
+    }
+}
+
+fn resolve_file_scope_declaration(
+    decl: Declaration,
+    hash_map: &mut HashMap<String, (String, bool, bool)>,
+) -> Result<Declaration> {
+    match decl {
+        Declaration::V(variable_declaration) => Ok(Declaration::V(
+            resolve_file_scope_variable_declaration(variable_declaration, hash_map)?,
+        )),
+        Declaration::F(function_declaration) => Ok(Declaration::F(
+            resolve_file_scope_function_declaration(function_declaration, hash_map)?,
+        )),
+    }
+}
+
 static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 pub fn variable_resolution(ast: Ast) -> Result<Ast> {
@@ -340,7 +391,7 @@ pub fn variable_resolution(ast: Ast) -> Result<Ast> {
             let mut hash_map: HashMap<String, (String, bool, bool)> = HashMap::new();
             let mut funcs = Vec::new();
             for func in functions {
-                funcs.push(resolve_function_declaration(func, &mut hash_map)?);
+                funcs.push(resolve_file_scope_declaration(func, &mut hash_map)?);
             }
             Ok(Ast::Program(funcs))
         }

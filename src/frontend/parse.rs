@@ -1,10 +1,19 @@
-use crate::frontend::lex::{self, Token};
+use crate::frontend::{
+    lex::{self, Token},
+    type_check::Type,
+};
 use anyhow::{Result, bail};
 use std::collections::VecDeque;
 
 #[derive(Debug, PartialEq)]
 pub enum Ast {
-    Program(Vec<FunctionDeclaration>),
+    Program(Vec<Declaration>),
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Declaration {
+    V(VariableDeclaration),
+    F(FunctionDeclaration),
 }
 
 #[derive(Debug, PartialEq)]
@@ -19,19 +28,19 @@ pub enum BlockItem {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum Declaration {
-    V(VariableDeclaration),
-    F(FunctionDeclaration),
-}
-
-#[derive(Debug, PartialEq)]
 pub enum VariableDeclaration {
-    D(String, Option<Expression>),
+    D(String, Option<Expression>, Option<StorageClass>),
 }
 
 #[derive(Debug, PartialEq)]
 pub enum FunctionDeclaration {
-    D(String, Vec<String>, Option<Block>),
+    D(String, Vec<String>, Option<Block>, Option<StorageClass>),
+}
+
+#[derive(Debug, PartialEq)]
+pub enum StorageClass {
+    Static,
+    Extern,
 }
 
 #[derive(Debug, PartialEq)]
@@ -327,7 +336,15 @@ fn parse_expression(tokens: &mut VecDeque<Token>, order: usize) -> Result<Expres
 /* for_init ::= <declaration> | [ <expression> ] ";" */
 fn parse_for_init(tokens: &mut VecDeque<Token>) -> Result<ForInit> {
     match &tokens[0] {
-        Token::Int => Ok(ForInit::D(parse_variable_declaration(tokens)?)),
+        Token::Int | Token::Extern | Token::Static => {
+            let declaration = parse_declaration(tokens)?;
+            match declaration {
+                Declaration::V(variable_declaration) => Ok(ForInit::D(variable_declaration)),
+                Declaration::F(_) => {
+                    bail!("Function declaration is not allowed in initializer of for loop")
+                }
+            }
+        }
         Token::Semicolon => {
             expect_token(Token::Semicolon, tokens.pop_front())?;
             Ok(ForInit::E(None))
@@ -479,37 +496,10 @@ fn parse_statement(tokens: &mut VecDeque<Token>) -> Result<Statement> {
     }
 }
 
-/* variable_declaration ::= "int" <identifier> [ "=" <expression> ] ";" */
-fn parse_variable_declaration(tokens: &mut VecDeque<Token>) -> Result<VariableDeclaration> {
-    expect_token(Token::Int, tokens.pop_front())?;
-    let id = parse_identifier(tokens)?;
-    match tokens.pop_front() {
-        Some(Token::Assignment) => {
-            let expression = parse_expression(tokens, 0)?;
-            expect_token(Token::Semicolon, tokens.pop_front())?;
-            Ok(VariableDeclaration::D(id, Some(expression)))
-        }
-        Some(Token::Semicolon) => Ok(VariableDeclaration::D(id, None)),
-        Some(x) => bail!("Broken declaration: got {}", x),
-        None => bail!("Broken declaration: end of file"),
-    }
-}
-
-/* declaration ::= variable_declaration | function_declaration */
-fn parse_declaration(tokens: &mut VecDeque<Token>) -> Result<Declaration> {
-    match &tokens[2] {
-        Token::OpenParanthesis => Ok(Declaration::F(parse_function_declaration(tokens)?)),
-        Token::Assignment | Token::Semicolon => {
-            Ok(Declaration::V(parse_variable_declaration(tokens)?))
-        }
-        x => bail!("Expected variable or function declaration, got {}", x),
-    }
-}
-
 /* block-item ::= <statement> | <declaration> */
 fn parse_block_item(tokens: &mut VecDeque<Token>) -> Result<BlockItem> {
     match &tokens[0] {
-        Token::Int => Ok(BlockItem::D(parse_declaration(tokens)?)),
+        Token::Int | Token::Extern | Token::Static => Ok(BlockItem::D(parse_declaration(tokens)?)),
         _ => Ok(BlockItem::S(parse_statement(tokens)?)),
     }
 }
@@ -547,28 +537,93 @@ fn parse_param_list(tokens: &mut VecDeque<Token>) -> Result<Vec<String>> {
     }
 }
 
+fn is_specifier(token: &Token) -> bool {
+    match token {
+        Token::Int | Token::Extern | Token::Static => true,
+        _ => false,
+    }
+}
+
+/* specifier ::= { "int" | "static" | "extern" }+ */
+fn parse_specifier(tokens: &mut VecDeque<Token>) -> Result<(Type, Option<StorageClass>)> {
+    let mut types: Vec<Type> = Vec::new();
+    let mut storage_classes: Vec<StorageClass> = Vec::new();
+    while is_specifier(&tokens[0]) {
+        match tokens.pop_front() {
+            Some(Token::Int) => types.push(Type::Int),
+            Some(Token::Extern) => storage_classes.push(StorageClass::Extern),
+            Some(Token::Static) => storage_classes.push(StorageClass::Static),
+            x => bail!("Expected specifier, got {:?}", x),
+        }
+    }
+
+    if types.len() != 1 {
+        bail!("Invalid type specifier: {:?}", types);
+    }
+
+    if storage_classes.len() > 1 {
+        bail!("Invalid storage class specifier: {:?}", storage_classes);
+    }
+
+    let Some(type_specifier) = types.pop() else {
+        bail!("Invalid type specifier: {:?}", types);
+    };
+
+    Ok((type_specifier, storage_classes.pop()))
+}
+
+/* declaration ::= <specifier> ( <variable_declaration> | <function_declaration> ) */
 /* function_declaration ::= "int" <identifier> "(" <param-list> ")" ( <block> | ";" ) */
-fn parse_function_declaration(tokens: &mut VecDeque<Token>) -> Result<FunctionDeclaration> {
-    expect_token(Token::Int, tokens.pop_front())?;
+/* variable_declaration ::= "int" <identifier> [ "=" <expression> ] ";" */
+fn parse_declaration(tokens: &mut VecDeque<Token>) -> Result<Declaration> {
+    let specifier = parse_specifier(tokens)?;
     let id = parse_identifier(tokens)?;
-    expect_token(Token::OpenParanthesis, tokens.pop_front())?;
-    let param_list = parse_param_list(tokens)?;
-    expect_token(Token::CloseParanthesis, tokens.pop_front())?;
-    let block = match &tokens[0] {
+    match &tokens[0] {
+        Token::OpenParanthesis => {
+            expect_token(Token::OpenParanthesis, tokens.pop_front())?;
+            let param_list = parse_param_list(tokens)?;
+            expect_token(Token::CloseParanthesis, tokens.pop_front())?;
+            let block = match &tokens[0] {
+                Token::Semicolon => {
+                    expect_token(Token::Semicolon, tokens.pop_front())?;
+                    None
+                }
+                _ => Some(parse_block(tokens)?),
+            };
+            Ok(Declaration::F(FunctionDeclaration::D(
+                id,
+                param_list,
+                block,
+                specifier.1,
+            )))
+        }
+        Token::Assignment => {
+            expect_token(Token::Assignment, tokens.pop_front())?;
+            let expression = parse_expression(tokens, 0)?;
+            expect_token(Token::Semicolon, tokens.pop_front())?;
+            Ok(Declaration::V(VariableDeclaration::D(
+                id,
+                Some(expression),
+                specifier.1,
+            )))
+        }
         Token::Semicolon => {
             expect_token(Token::Semicolon, tokens.pop_front())?;
-            None
+            Ok(Declaration::V(VariableDeclaration::D(
+                id,
+                None,
+                specifier.1,
+            )))
         }
-        _ => Some(parse_block(tokens)?),
-    };
-    Ok(FunctionDeclaration::D(id, param_list, block))
+        x => bail!("Expected variable or function declaration, got {}", x),
+    }
 }
 
 /* program ::= { <function-declaration> } */
 pub fn parse_tokens(mut tokens: VecDeque<Token>) -> Result<Ast> {
     let mut result = Vec::new();
-    while tokens.len() > 0 && matches!(tokens[0], Token::Int) {
-        result.push(parse_function_declaration(&mut tokens)?);
+    while tokens.len() > 0 && is_specifier(&tokens[0]) {
+        result.push(parse_declaration(&mut tokens)?);
     }
 
     match tokens.pop_front() {
