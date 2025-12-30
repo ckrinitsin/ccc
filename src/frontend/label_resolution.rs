@@ -3,7 +3,7 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use crate::frontend::parse::{Ast, Block, BlockItem, Declaration, FunctionDeclaration, Statement};
+use crate::frontend::ast::{Ast, Block, BlockItem, Declaration, FunctionDeclaration, Statement};
 use anyhow::{Result, bail};
 
 fn gen_label(id: String) -> String {
@@ -189,12 +189,13 @@ fn resolve_label_declaration(
     hash_map: &mut HashMap<String, String>,
 ) -> Result<Declaration> {
     match decl {
-        Declaration::F(FunctionDeclaration::D(name, args, block, storage_class)) => {
+        Declaration::F(FunctionDeclaration::D(name, args, block, var_type, storage_class)) => {
             let Some(bl) = block else {
                 return Ok(Declaration::F(FunctionDeclaration::D(
                     name,
                     args,
                     block,
+                    var_type,
                     storage_class,
                 )));
             };
@@ -204,6 +205,7 @@ fn resolve_label_declaration(
                 name,
                 args,
                 block,
+                var_type,
                 storage_class,
             )))
         }

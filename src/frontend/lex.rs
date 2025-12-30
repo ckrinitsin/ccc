@@ -6,8 +6,10 @@ use std::fmt;
 #[derive(Debug, PartialEq)]
 pub enum Token {
     Identifier(String),
-    Constant(i32),
+    IntConstant(i64),
+    LongConstant(i64),
     Int,
+    Long,
     Void,
     Return,
     OpenParanthesis,
@@ -67,70 +69,76 @@ pub enum Token {
 }
 
 impl Token {
-    pub fn patterns() -> Vec<(Regex, fn(&str) -> Token)> {
+    pub fn patterns() -> Vec<(Regex, fn(&str) -> Result<Token>)> {
         vec![
-            (Regex::new(r"<<\=").unwrap(), |_| Token::CLShift),
-            (Regex::new(r">>\=").unwrap(), |_| Token::CRShift),
-            (Regex::new(r"\-\=").unwrap(), |_| Token::CNegation),
-            (Regex::new(r"\+\=").unwrap(), |_| Token::CAddition),
-            (Regex::new(r"\^\=").unwrap(), |_| Token::CXor),
-            (Regex::new(r"\|\=").unwrap(), |_| Token::COr),
-            (Regex::new(r"\&\=").unwrap(), |_| Token::CAnd),
-            (Regex::new(r"\*\=").unwrap(), |_| Token::CMultiplication),
-            (Regex::new(r"\/\=").unwrap(), |_| Token::CDivision),
-            (Regex::new(r"\%\=").unwrap(), |_| Token::CModulo),
-            (Regex::new(r"\&\&").unwrap(), |_| Token::LAnd),
-            (Regex::new(r"\|\|").unwrap(), |_| Token::LOr),
-            (Regex::new(r"\=\=").unwrap(), |_| Token::Equal),
-            (Regex::new(r"\!\=").unwrap(), |_| Token::NEqual),
-            (Regex::new(r"<<").unwrap(), |_| Token::LShift),
-            (Regex::new(r">>").unwrap(), |_| Token::RShift),
-            (Regex::new(r"<\=").unwrap(), |_| Token::LessEq),
-            (Regex::new(r">\=").unwrap(), |_| Token::GreaterEq),
-            (Regex::new(r"\!").unwrap(), |_| Token::Not),
-            (Regex::new(r"\+\+").unwrap(), |_| Token::Increment),
-            (Regex::new(r"\-\-").unwrap(), |_| Token::Decrement),
-            (Regex::new(r"\?").unwrap(), |_| Token::QuestionMark),
-            (Regex::new(r"\:").unwrap(), |_| Token::Colon),
-            (Regex::new(r"\,").unwrap(), |_| Token::Comma),
-            (Regex::new(r"<").unwrap(), |_| Token::Less),
-            (Regex::new(r">").unwrap(), |_| Token::Greater),
-            (Regex::new(r"\-").unwrap(), |_| Token::Negation),
-            (Regex::new(r"\=").unwrap(), |_| Token::Assignment),
-            (Regex::new(r"\+").unwrap(), |_| Token::Addition),
-            (Regex::new(r"\^").unwrap(), |_| Token::Xor),
-            (Regex::new(r"\|").unwrap(), |_| Token::Or),
-            (Regex::new(r"\&").unwrap(), |_| Token::And),
-            (Regex::new(r"\*").unwrap(), |_| Token::Multiplication),
-            (Regex::new(r"\/").unwrap(), |_| Token::Division),
-            (Regex::new(r"\%").unwrap(), |_| Token::Modulo),
-            (Regex::new(r"\~").unwrap(), |_| Token::Complement),
-            (Regex::new(r"\{").unwrap(), |_| Token::OpenBrace),
-            (Regex::new(r"\}").unwrap(), |_| Token::CloseBrace),
-            (Regex::new(r"\(").unwrap(), |_| Token::OpenParanthesis),
-            (Regex::new(r"\)").unwrap(), |_| Token::CloseParanthesis),
-            (Regex::new(r"\;").unwrap(), |_| Token::Semicolon),
-            (Regex::new(r"return\b").unwrap(), |_| Token::Return),
-            (Regex::new(r"void\b").unwrap(), |_| Token::Void),
-            (Regex::new(r"static\b").unwrap(), |_| Token::Static),
-            (Regex::new(r"extern\b").unwrap(), |_| Token::Extern),
-            (Regex::new(r"int\b").unwrap(), |_| Token::Int),
-            (Regex::new(r"if\b").unwrap(), |_| Token::If),
-            (Regex::new(r"do\b").unwrap(), |_| Token::Do),
-            (Regex::new(r"while\b").unwrap(), |_| Token::While),
-            (Regex::new(r"for\b").unwrap(), |_| Token::For),
-            (Regex::new(r"break\b").unwrap(), |_| Token::Break),
-            (Regex::new(r"continue\b").unwrap(), |_| Token::Continue),
-            (Regex::new(r"else\b").unwrap(), |_| Token::Else),
-            (Regex::new(r"goto\b").unwrap(), |_| Token::Goto),
-            (Regex::new(r"switch\b").unwrap(), |_| Token::Switch),
-            (Regex::new(r"case\b").unwrap(), |_| Token::Case),
-            (Regex::new(r"default\b").unwrap(), |_| Token::Default),
+            (Regex::new(r"<<\=").unwrap(), |_| Ok(Token::CLShift)),
+            (Regex::new(r">>\=").unwrap(), |_| Ok(Token::CRShift)),
+            (Regex::new(r"\-\=").unwrap(), |_| Ok(Token::CNegation)),
+            (Regex::new(r"\+\=").unwrap(), |_| Ok(Token::CAddition)),
+            (Regex::new(r"\^\=").unwrap(), |_| Ok(Token::CXor)),
+            (Regex::new(r"\|\=").unwrap(), |_| Ok(Token::COr)),
+            (Regex::new(r"\&\=").unwrap(), |_| Ok(Token::CAnd)),
+            (Regex::new(r"\*\=").unwrap(), |_| Ok(Token::CMultiplication)),
+            (Regex::new(r"\/\=").unwrap(), |_| Ok(Token::CDivision)),
+            (Regex::new(r"\%\=").unwrap(), |_| Ok(Token::CModulo)),
+            (Regex::new(r"\&\&").unwrap(), |_| Ok(Token::LAnd)),
+            (Regex::new(r"\|\|").unwrap(), |_| Ok(Token::LOr)),
+            (Regex::new(r"\=\=").unwrap(), |_| Ok(Token::Equal)),
+            (Regex::new(r"\!\=").unwrap(), |_| Ok(Token::NEqual)),
+            (Regex::new(r"<<").unwrap(), |_| Ok(Token::LShift)),
+            (Regex::new(r">>").unwrap(), |_| Ok(Token::RShift)),
+            (Regex::new(r"<\=").unwrap(), |_| Ok(Token::LessEq)),
+            (Regex::new(r">\=").unwrap(), |_| Ok(Token::GreaterEq)),
+            (Regex::new(r"\!").unwrap(), |_| Ok(Token::Not)),
+            (Regex::new(r"\+\+").unwrap(), |_| Ok(Token::Increment)),
+            (Regex::new(r"\-\-").unwrap(), |_| Ok(Token::Decrement)),
+            (Regex::new(r"\?").unwrap(), |_| Ok(Token::QuestionMark)),
+            (Regex::new(r"\:").unwrap(), |_| Ok(Token::Colon)),
+            (Regex::new(r"\,").unwrap(), |_| Ok(Token::Comma)),
+            (Regex::new(r"<").unwrap(), |_| Ok(Token::Less)),
+            (Regex::new(r">").unwrap(), |_| Ok(Token::Greater)),
+            (Regex::new(r"\-").unwrap(), |_| Ok(Token::Negation)),
+            (Regex::new(r"\=").unwrap(), |_| Ok(Token::Assignment)),
+            (Regex::new(r"\+").unwrap(), |_| Ok(Token::Addition)),
+            (Regex::new(r"\^").unwrap(), |_| Ok(Token::Xor)),
+            (Regex::new(r"\|").unwrap(), |_| Ok(Token::Or)),
+            (Regex::new(r"\&").unwrap(), |_| Ok(Token::And)),
+            (Regex::new(r"\*").unwrap(), |_| Ok(Token::Multiplication)),
+            (Regex::new(r"\/").unwrap(), |_| Ok(Token::Division)),
+            (Regex::new(r"\%").unwrap(), |_| Ok(Token::Modulo)),
+            (Regex::new(r"\~").unwrap(), |_| Ok(Token::Complement)),
+            (Regex::new(r"\{").unwrap(), |_| Ok(Token::OpenBrace)),
+            (Regex::new(r"\}").unwrap(), |_| Ok(Token::CloseBrace)),
+            (Regex::new(r"\(").unwrap(), |_| Ok(Token::OpenParanthesis)),
+            (Regex::new(r"\)").unwrap(), |_| Ok(Token::CloseParanthesis)),
+            (Regex::new(r"\;").unwrap(), |_| Ok(Token::Semicolon)),
+            (Regex::new(r"return\b").unwrap(), |_| Ok(Token::Return)),
+            (Regex::new(r"void\b").unwrap(), |_| Ok(Token::Void)),
+            (Regex::new(r"static\b").unwrap(), |_| Ok(Token::Static)),
+            (Regex::new(r"extern\b").unwrap(), |_| Ok(Token::Extern)),
+            (Regex::new(r"int\b").unwrap(), |_| Ok(Token::Int)),
+            (Regex::new(r"long\b").unwrap(), |_| Ok(Token::Long)),
+            (Regex::new(r"if\b").unwrap(), |_| Ok(Token::If)),
+            (Regex::new(r"do\b").unwrap(), |_| Ok(Token::Do)),
+            (Regex::new(r"while\b").unwrap(), |_| Ok(Token::While)),
+            (Regex::new(r"for\b").unwrap(), |_| Ok(Token::For)),
+            (Regex::new(r"break\b").unwrap(), |_| Ok(Token::Break)),
+            (Regex::new(r"continue\b").unwrap(), |_| Ok(Token::Continue)),
+            (Regex::new(r"else\b").unwrap(), |_| Ok(Token::Else)),
+            (Regex::new(r"goto\b").unwrap(), |_| Ok(Token::Goto)),
+            (Regex::new(r"switch\b").unwrap(), |_| Ok(Token::Switch)),
+            (Regex::new(r"case\b").unwrap(), |_| Ok(Token::Case)),
+            (Regex::new(r"default\b").unwrap(), |_| Ok(Token::Default)),
+            (Regex::new(r"[0-9]+[lL]\b").unwrap(), |s| {
+                let cons = s[..s.len() - 1].parse::<i64>()?;
+                Ok(Token::LongConstant(cons))
+            }),
             (Regex::new(r"[0-9]+\b").unwrap(), |s| {
-                Token::Constant(s.parse::<i32>().unwrap())
+                let cons = s.parse::<i64>()?;
+                Ok(Token::IntConstant(cons))
             }),
             (Regex::new(r"[a-zA-Z_]\w*\b").unwrap(), |s| {
-                Token::Identifier(s.to_string())
+                Ok(Token::Identifier(s.to_string()))
             }),
         ]
     }
@@ -140,8 +148,10 @@ impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Token::Identifier(x) => write!(f, "{}", x),
-            Token::Constant(x) => write!(f, "{}", x),
+            Token::IntConstant(x) => write!(f, "{}", x),
+            Token::LongConstant(x) => write!(f, "{}", x),
             Token::Int => write!(f, "int"),
+            Token::Long => write!(f, "long"),
             Token::Void => write!(f, "void"),
             Token::Return => write!(f, "return"),
             Token::OpenParanthesis => write!(f, "("),
@@ -251,6 +261,45 @@ pub fn is_unary(token: &Token) -> bool {
     }
 }
 
+pub fn is_assignment(tok: &Token) -> bool {
+    match tok {
+        Token::Assignment
+        | Token::CAddition
+        | Token::CNegation
+        | Token::CMultiplication
+        | Token::CDivision
+        | Token::CModulo
+        | Token::CAnd
+        | Token::COr
+        | Token::CXor
+        | Token::CLShift
+        | Token::CRShift => true,
+        _ => false,
+    }
+}
+
+pub fn is_specifier(token: &Token) -> bool {
+    match token {
+        Token::Extern | Token::Static => true,
+        n if is_type_specifier(n) => true,
+        _ => false,
+    }
+}
+
+pub fn is_type_specifier(tok: &Token) -> bool {
+    match tok {
+        Token::Int | Token::Long => true,
+        _ => false,
+    }
+}
+
+pub fn is_constant(tok: &Token) -> bool {
+    match tok {
+        Token::IntConstant(_) | Token::LongConstant(_) => true,
+        _ => false,
+    }
+}
+
 pub fn precedence(token: &Token) -> usize {
     match token {
         Token::Multiplication | Token::Division | Token::Modulo => 50,
@@ -287,7 +336,7 @@ pub fn lex(content: String) -> Result<VecDeque<Token>> {
         for (re, tok) in &patterns {
             if let Some(m) = re.find(remaining) {
                 if !m.is_empty() && m.start() == 0 {
-                    tokens.push_back(tok(m.as_str()));
+                    tokens.push_back(tok(m.as_str())?);
                     remaining = remaining[m.end()..].trim_start();
                     continue 'outer;
                 }

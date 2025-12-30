@@ -3,7 +3,7 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use crate::frontend::parse::{
+use crate::frontend::ast::{
     Ast, Block, BlockItem, Declaration, Expression, ForInit, FunctionDeclaration, Statement,
     StorageClass, UnaryOp, VariableDeclaration,
 };
@@ -19,10 +19,8 @@ fn copy_hashmap(
     hash_map: &HashMap<String, (String, bool, bool)>,
 ) -> HashMap<String, (String, bool, bool)> {
     let mut result: HashMap<String, (String, bool, bool)> = HashMap::new();
-    for key in hash_map.keys() {
-        let value = hash_map.get(key).unwrap().0.clone();
-        let linkage = hash_map.get(key).unwrap().2.clone();
-        result.insert(key.clone(), (value, false, linkage));
+    for item in hash_map {
+        result.insert(item.0.clone(), (item.1.0.clone(), false, item.1.2.clone()));
     }
     result
 }
@@ -32,70 +30,77 @@ fn resolve_expression(
     hash_map: &mut HashMap<String, (String, bool, bool)>,
 ) -> Result<Expression> {
     match expr {
-        Expression::Variable(x) => {
+        Expression::Variable(x, _) => {
             if let Some(r) = hash_map.get(&x) {
-                return Ok(Expression::Variable(r.0.to_string()));
+                return Ok(Expression::Variable(r.0.to_string(), None));
             } else {
                 bail!("Undeclared variable {}", x);
             }
         }
-        Expression::Unary(unary_op, expression) => {
+        Expression::Unary(unary_op, expression, _) => {
             if (matches!(unary_op, UnaryOp::Increment) || matches!(unary_op, UnaryOp::Decrement))
-                && !matches!(*expression, Expression::Variable(_))
+                && !matches!(*expression, Expression::Variable(_, _))
             {
                 bail!("{:?} is not a valid lvalue", *expression);
             }
             Ok(Expression::Unary(
                 unary_op,
                 Box::new(resolve_expression(*expression, hash_map)?),
+                None,
             ))
         }
-        Expression::Binary(binary_op, left, right) => Ok(Expression::Binary(
+        Expression::Binary(binary_op, left, right, _) => Ok(Expression::Binary(
             binary_op,
             Box::new(resolve_expression(*left, hash_map)?),
             Box::new(resolve_expression(*right, hash_map)?),
+            None,
         )),
-        Expression::Assignment(left, right) => {
-            if !matches!(*left, Expression::Variable(_)) {
+        Expression::Assignment(left, right, _) => {
+            if !matches!(*left, Expression::Variable(_, _)) {
                 bail!("{:?} is not a valid lvalue", *left);
             }
             Ok(Expression::Assignment(
                 Box::new(resolve_expression(*left, hash_map)?),
                 Box::new(resolve_expression(*right, hash_map)?),
+                None,
             ))
         }
-        Expression::CompoundAssignment(binary_op, left, right) => {
-            if !matches!(*left, Expression::Variable(_)) {
+        Expression::CompoundAssignment(binary_op, left, right, _) => {
+            if !matches!(*left, Expression::Variable(_, _)) {
                 bail!("{:?} is not a valid lvalue", *left);
             }
             Ok(Expression::CompoundAssignment(
                 binary_op,
                 Box::new(resolve_expression(*left, hash_map)?),
                 Box::new(resolve_expression(*right, hash_map)?),
+                None,
             ))
         }
-        Expression::PostIncr(expr) => {
-            if !matches!(*expr, Expression::Variable(_)) {
+        Expression::PostIncr(expr, _) => {
+            if !matches!(*expr, Expression::Variable(_, _)) {
                 bail!("{:?} is not a valid lvalue", *expr);
             }
-            Ok(Expression::PostIncr(Box::new(resolve_expression(
-                *expr, hash_map,
-            )?)))
+            Ok(Expression::PostIncr(
+                Box::new(resolve_expression(*expr, hash_map)?),
+                None,
+            ))
         }
-        Expression::PostDecr(expr) => {
-            if !matches!(*expr, Expression::Variable(_)) {
+        Expression::PostDecr(expr, _) => {
+            if !matches!(*expr, Expression::Variable(_, _)) {
                 bail!("{:?} is not a valid lvalue", *expr);
             }
-            Ok(Expression::PostDecr(Box::new(resolve_expression(
-                *expr, hash_map,
-            )?)))
+            Ok(Expression::PostDecr(
+                Box::new(resolve_expression(*expr, hash_map)?),
+                None,
+            ))
         }
-        Expression::Conditional(left, middle, right) => Ok(Expression::Conditional(
+        Expression::Conditional(left, middle, right, _) => Ok(Expression::Conditional(
             Box::new(resolve_expression(*left, hash_map)?),
             Box::new(resolve_expression(*middle, hash_map)?),
             Box::new(resolve_expression(*right, hash_map)?),
+            None,
         )),
-        Expression::FunctionCall(name, args) => {
+        Expression::FunctionCall(name, args, _) => {
             if !hash_map.contains_key(&name) {
                 bail!("Undeclared identifier {}", name);
             }
@@ -108,8 +113,14 @@ fn resolve_expression(
             Ok(Expression::FunctionCall(
                 hash_map.get(&name).unwrap().0.to_string(),
                 new_args,
+                None,
             ))
         }
+        Expression::Cast(var_type, expression, _) => Ok(Expression::Cast(
+            var_type,
+            Box::new(resolve_expression(*expression, hash_map)?),
+            None,
+        )),
         c => Ok(c),
     }
 }
@@ -223,7 +234,7 @@ fn resolve_local_variable_declaration(
     hash_map: &mut HashMap<String, (String, bool, bool)>,
 ) -> Result<VariableDeclaration> {
     match decl {
-        VariableDeclaration::D(id, opt_expression, storage_class) => {
+        VariableDeclaration::D(id, opt_expression, var_type, storage_class) => {
             if let Some(prev_entry) = hash_map.get(&id) {
                 if prev_entry.1
                     && !(prev_entry.2 && matches!(storage_class, Some(StorageClass::Extern)))
@@ -234,16 +245,31 @@ fn resolve_local_variable_declaration(
 
             if matches!(storage_class, Some(StorageClass::Extern)) {
                 hash_map.insert(id.clone(), (id.clone(), true, true));
-                return Ok(VariableDeclaration::D(id, opt_expression, storage_class));
+                return Ok(VariableDeclaration::D(
+                    id,
+                    opt_expression,
+                    var_type,
+                    storage_class,
+                ));
             }
 
             let unique = gen_temp_local(id.clone());
             hash_map.insert(id, (unique.clone(), true, false));
             if let Some(expr) = opt_expression {
                 let expr = resolve_expression(expr, hash_map)?;
-                return Ok(VariableDeclaration::D(unique, Some(expr), storage_class));
+                return Ok(VariableDeclaration::D(
+                    unique,
+                    Some(expr),
+                    var_type,
+                    storage_class,
+                ));
             }
-            Ok(VariableDeclaration::D(unique, None, storage_class))
+            Ok(VariableDeclaration::D(
+                unique,
+                None,
+                var_type,
+                storage_class,
+            ))
         }
     }
 }
@@ -265,9 +291,14 @@ fn resolve_file_scope_variable_declaration(
     hash_map: &mut HashMap<String, (String, bool, bool)>,
 ) -> Result<VariableDeclaration> {
     match decl {
-        VariableDeclaration::D(id, opt_expression, storage_class) => {
+        VariableDeclaration::D(id, opt_expression, var_type, storage_class) => {
             hash_map.insert(id.clone(), (id.clone(), true, true));
-            Ok(VariableDeclaration::D(id, opt_expression, storage_class))
+            Ok(VariableDeclaration::D(
+                id,
+                opt_expression,
+                var_type,
+                storage_class,
+            ))
         }
     }
 }
@@ -277,7 +308,7 @@ fn resolve_file_scope_function_declaration(
     hash_map: &mut HashMap<String, (String, bool, bool)>,
 ) -> Result<FunctionDeclaration> {
     match decl {
-        FunctionDeclaration::D(name, params, block, storage_class) => {
+        FunctionDeclaration::D(name, params, block, var_type, storage_class) => {
             if hash_map.contains_key(&name)
                 && hash_map.get(&name).unwrap().1
                 && !hash_map.get(&name).unwrap().2
@@ -301,6 +332,7 @@ fn resolve_file_scope_function_declaration(
                 name,
                 new_params,
                 new_block,
+                var_type,
                 storage_class,
             ))
         }
@@ -312,7 +344,7 @@ fn resolve_local_function_declaration(
     hash_map: &mut HashMap<String, (String, bool, bool)>,
 ) -> Result<FunctionDeclaration> {
     match &decl {
-        FunctionDeclaration::D(_, _, block, storage_class) => {
+        FunctionDeclaration::D(_, _, block, _, storage_class) => {
             if *block != None {
                 bail!("Function definition inside another function is not allowed!");
             }
