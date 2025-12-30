@@ -1,3 +1,4 @@
+pub mod ast;
 pub mod identifier_resolution;
 pub mod ir;
 pub mod label_resolution;

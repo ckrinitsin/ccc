@@ -4,7 +4,8 @@ An attempt to write an (educational) C(17) compiler. Provides a Lexer, Parser an
 
 The compiler driver uses GCC's preprocessor and assembler/linker, to help turning the code into an executable.
 
-Supports:
+### Supports:
+
 - Return
 - Unary operators (!, ~, -)
 - Binary arithmetic and logical operators (+, -, \*, /, %, <<, >>, &, |)
@@ -15,16 +16,5 @@ Supports:
 - Compound Statements
 - Loops and Switch Statements
 - Function calls
-- ~~File scope~~
-
-Here is an example of now compilable c code:
-```
-int main(void) {
-    int a = 2 >> 1;
-    int b = 1;
-    b += 1;
-    int c = a++;
-    int d = --b;
-    return (a == 2 && b == 1 && c == 1 && d == 1); // returns 1
-}
-```
+- File scope
+- Long type

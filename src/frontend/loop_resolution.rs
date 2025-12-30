@@ -3,8 +3,8 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
-use crate::frontend::parse::{
-    Ast, Block, BlockItem, Declaration, Expression, FunctionDeclaration, Statement,
+use crate::frontend::ast::{
+    Ast, Block, BlockItem, Const, Declaration, Expression, FunctionDeclaration, Statement,
 };
 use anyhow::{Result, bail};
 
@@ -18,7 +18,7 @@ fn resolve_loop_statement(
     hash_map: &mut HashMap<String, String>,
     current_loop: Option<String>,
     current_switch: Option<String>,
-    collected_cases: &mut Option<Vec<(Option<i32>, String)>>,
+    collected_cases: &mut Option<Vec<(Option<Const>, String)>>,
 ) -> Result<Statement> {
     match statement {
         Statement::Labeled(id, statement) => Ok(Statement::Labeled(
@@ -131,18 +131,18 @@ fn resolve_loop_statement(
                 bail!("Case not inside a switch statement");
             };
             match expression {
-                Expression::Constant(c) => {
+                Expression::Constant(val, _) => {
                     if unwrapped_cases.iter().any(|(constant, _)| {
                         if let Some(con) = constant {
-                            return *con == c;
+                            return *con == val;
                         }
                         false
                     }) {
-                        bail!("Case {} is duplicated", c);
+                        bail!("Case {:?} is duplicated", val);
                     }
-                    unwrapped_cases.push((Some(c), n_label.clone()));
+                    unwrapped_cases.push((Some(val.clone()), n_label.clone()));
                     Ok(Statement::Case(
-                        expression,
+                        Expression::Constant(val, None),
                         Box::new(resolve_loop_statement(
                             *statement,
                             hash_map,
@@ -158,7 +158,7 @@ fn resolve_loop_statement(
         }
         Statement::Switch(expression, statement, _, _) => {
             let n_label = Some(gen_label("switch".to_string()));
-            let mut new_cases: Option<Vec<(Option<i32>, String)>> = Some(Vec::new());
+            let mut new_cases: Option<Vec<(Option<Const>, String)>> = Some(Vec::new());
             Ok(Statement::Switch(
                 expression,
                 Box::new(resolve_loop_statement(
@@ -204,7 +204,7 @@ fn resolve_loop_block(
     hash_map: &mut HashMap<String, String>,
     current_loop: Option<String>,
     current_switch: Option<String>,
-    collected_cases: &mut Option<Vec<(Option<i32>, String)>>,
+    collected_cases: &mut Option<Vec<(Option<Const>, String)>>,
 ) -> Result<Block> {
     match block {
         Block::B(block_items) => {
@@ -232,12 +232,13 @@ fn resolve_loop_declaration(
     hash_map: &mut HashMap<String, String>,
 ) -> Result<Declaration> {
     match decl {
-        Declaration::F(FunctionDeclaration::D(name, args, block, storage_class)) => {
+        Declaration::F(FunctionDeclaration::D(name, args, block, var_type, storage_class)) => {
             let Some(bl) = block else {
                 return Ok(Declaration::F(FunctionDeclaration::D(
                     name,
                     args,
                     block,
+                    var_type,
                     storage_class,
                 )));
             };
@@ -246,6 +247,7 @@ fn resolve_loop_declaration(
                 name,
                 args,
                 block,
+                var_type,
                 storage_class,
             )))
         }
