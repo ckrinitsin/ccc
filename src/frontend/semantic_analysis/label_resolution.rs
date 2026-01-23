@@ -1,15 +1,8 @@
-use std::{
-    collections::HashMap,
-    sync::atomic::{AtomicUsize, Ordering},
-};
+use std::collections::HashMap;
 
 use crate::frontend::ast::{Ast, Block, BlockItem, Declaration, FunctionDeclaration, Statement};
+use crate::frontend::utils::counter::gen_named_label;
 use anyhow::{Result, bail};
-
-fn gen_label(id: String) -> String {
-    let counter = COUNTER.fetch_add(1, Ordering::SeqCst);
-    id + ".." + &counter.to_string()
-}
 
 fn resolve_goto_statement(
     statement: Statement,
@@ -88,7 +81,7 @@ fn resolve_label_statement(
                 bail!("Duplicate label: {}", id);
             }
 
-            let new_label = gen_label(id.clone());
+            let new_label = gen_named_label(id.clone());
             hash_map.insert(id, new_label.clone());
             Ok(Statement::Labeled(
                 new_label,
@@ -213,11 +206,7 @@ fn resolve_label_declaration(
     }
 }
 
-static COUNTER: AtomicUsize = AtomicUsize::new(0);
-
 pub fn label_resolution(ast: Ast) -> Result<Ast> {
-    COUNTER.store(0, Ordering::SeqCst);
-
     match ast {
         Ast::Program(functions) => {
             let mut funcs = Vec::new();

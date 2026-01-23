@@ -1,4 +1,5 @@
 use crate::backend::codegen::*;
+use crate::frontend::semantic_analysis::type_check;
 use std::fmt;
 
 impl fmt::Display for Asm {
@@ -39,22 +40,22 @@ impl fmt::Display for TopLevel {
             TopLevel::StaticVariable(name, global, alignment, init) => {
                 write_global(f, name, *global)?;
                 match init {
-                    crate::frontend::type_check::StaticInit::IntInit(0) => {
+                    type_check::StaticInit::IntInit(0) => {
                         write!(f, "  .bss\n")?;
                         write!(f, "  .align {}\n", alignment)?;
                         write!(f, "{}:\n  .zero 4\n", name)
                     }
-                    crate::frontend::type_check::StaticInit::LongInit(0) => {
+                    type_check::StaticInit::LongInit(0) => {
                         write!(f, "  .bss\n")?;
                         write!(f, "  .align {}\n", alignment)?;
                         write!(f, "{}:\n  .zero 8\n", name)
                     }
-                    crate::frontend::type_check::StaticInit::IntInit(x) => {
+                    type_check::StaticInit::IntInit(x) => {
                         write!(f, "  .data\n")?;
                         write!(f, "  .align {}\n", alignment)?;
                         write!(f, "{}:\n  .long {}\n", name, x)
                     }
-                    crate::frontend::type_check::StaticInit::LongInit(x) => {
+                    type_check::StaticInit::LongInit(x) => {
                         write!(f, "  .data\n")?;
                         write!(f, "  .align {}\n", alignment)?;
                         write!(f, "{}:\n  .quad {}\n", name, x)

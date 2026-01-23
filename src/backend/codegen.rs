@@ -1,6 +1,6 @@
 use crate::frontend::ast::Type;
 use crate::frontend::ir;
-use crate::frontend::type_check::{IdentifierAttributes, StaticInit};
+use crate::frontend::semantic_analysis::type_check::{IdentifierAttributes, StaticInit};
 use anyhow::{Result, bail};
 use std::cmp::min;
 use std::collections::HashMap;

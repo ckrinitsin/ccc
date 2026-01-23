@@ -1,11 +1,11 @@
 use crate::backend::codegen;
-use crate::frontend::identifier_resolution;
 use crate::frontend::ir;
-use crate::frontend::label_resolution;
 use crate::frontend::lex;
-use crate::frontend::loop_resolution;
 use crate::frontend::parse;
-use crate::frontend::type_check;
+use crate::frontend::semantic_analysis::identifier_resolution;
+use crate::frontend::semantic_analysis::label_resolution;
+use crate::frontend::semantic_analysis::loop_resolution;
+use crate::frontend::semantic_analysis::type_check;
 use anyhow::Result;
 use anyhow::bail;
 use clap::Parser;
@@ -20,6 +20,7 @@ use std::process::Command;
 #[command(version, about, long_about = None)]
 struct Cli {
     /// Input c programs
+    #[arg(required = true)]
     files: Vec<PathBuf>,
 
     /// Run lexer and stop afterwards
@@ -115,7 +116,7 @@ pub fn cli() -> Result<()> {
             continue;
         }
 
-        let ir = ir::lift_to_ir(analyzed_ast, &mut symbol_table)?;
+        let ir = ir::lift::lift_to_ir(analyzed_ast, &mut symbol_table)?;
 
         if args.tacky {
             println!("IR for {:?}:", file);

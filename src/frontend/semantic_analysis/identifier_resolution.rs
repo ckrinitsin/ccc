@@ -1,19 +1,11 @@
-use std::{
-    collections::HashMap,
-    sync::atomic::{AtomicUsize, Ordering},
-};
+use std::collections::HashMap;
 
 use crate::frontend::ast::{
     Ast, Block, BlockItem, Declaration, Expression, ForInit, FunctionDeclaration, Statement,
     StorageClass, UnaryOp, VariableDeclaration,
 };
+use crate::frontend::utils::counter::gen_var_local;
 use anyhow::{Result, bail};
-
-// TODO: refactor to one global counter, don't use multiple dots and different counters
-fn gen_temp_local(id: String) -> String {
-    let counter = COUNTER.fetch_add(1, Ordering::SeqCst);
-    id + "...." + &counter.to_string()
-}
 
 fn copy_hashmap(
     hash_map: &HashMap<String, (String, bool, bool)>,
@@ -253,7 +245,7 @@ fn resolve_local_variable_declaration(
                 ));
             }
 
-            let unique = gen_temp_local(id.clone());
+            let unique = gen_var_local(id.clone());
             hash_map.insert(id, (unique.clone(), true, false));
             if let Some(expr) = opt_expression {
                 let expr = resolve_expression(expr, hash_map)?;
@@ -281,7 +273,7 @@ fn resolve_identifier_declaration(
     if hash_map.contains_key(&name) && hash_map.get(&name).unwrap().1 {
         bail!("Duplicate declaration of {}", name);
     }
-    let unique = gen_temp_local(name.clone());
+    let unique = gen_var_local(name.clone());
     hash_map.insert(name, (unique.clone(), true, false));
     Ok(unique)
 }
@@ -412,11 +404,7 @@ fn resolve_file_scope_declaration(
     }
 }
 
-static COUNTER: AtomicUsize = AtomicUsize::new(0);
-
 pub fn variable_resolution(ast: Ast) -> Result<Ast> {
-    COUNTER.store(0, Ordering::SeqCst);
-
     match ast {
         Ast::Program(functions) => {
             /* HashMap<name, (unique_name, current_scope, external_linkage)> */

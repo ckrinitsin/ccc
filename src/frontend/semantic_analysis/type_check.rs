@@ -1,8 +1,4 @@
-use std::{
-    collections::HashMap,
-    iter::zip,
-    sync::atomic::{AtomicUsize, Ordering},
-};
+use std::{collections::HashMap, iter::zip};
 
 use crate::frontend::ast::{
     Ast, BinaryOp, Block, BlockItem, Const, Declaration, Expression, ForInit, FunctionDeclaration,
@@ -729,10 +725,7 @@ fn typecheck_block(
     }
 }
 
-static COUNTER: AtomicUsize = AtomicUsize::new(0);
-
 pub fn type_check(ast: Ast) -> Result<(Ast, HashMap<String, (Type, IdentifierAttributes)>)> {
-    COUNTER.store(0, Ordering::SeqCst);
     /* HashMap<name, (type, attributes)> */
     let mut hash_map: HashMap<String, (Type, IdentifierAttributes)> = HashMap::new();
 

@@ -1,17 +1,10 @@
-use std::{
-    collections::HashMap,
-    sync::atomic::{AtomicUsize, Ordering},
-};
+use std::collections::HashMap;
 
 use crate::frontend::ast::{
     Ast, Block, BlockItem, Const, Declaration, Expression, FunctionDeclaration, Statement,
 };
+use crate::frontend::utils::counter::gen_named_label;
 use anyhow::{Result, bail};
-
-fn gen_label(id: String) -> String {
-    let counter = COUNTER.fetch_add(1, Ordering::SeqCst);
-    id + "..." + &counter.to_string()
-}
 
 fn resolve_loop_statement(
     statement: Statement,
@@ -71,7 +64,7 @@ fn resolve_loop_statement(
             collected_cases,
         )?)),
         Statement::While(expression, statement, _) => {
-            let label_loop = Some(gen_label("while".to_string()));
+            let label_loop = Some(gen_named_label("while".to_string()));
             Ok(Statement::While(
                 expression,
                 Box::new(resolve_loop_statement(
@@ -85,7 +78,7 @@ fn resolve_loop_statement(
             ))
         }
         Statement::DoWhile(statement, expression, _) => {
-            let label_loop = Some(gen_label("do_while".to_string()));
+            let label_loop = Some(gen_named_label("do_while".to_string()));
             Ok(Statement::DoWhile(
                 Box::new(resolve_loop_statement(
                     *statement,
@@ -99,7 +92,7 @@ fn resolve_loop_statement(
             ))
         }
         Statement::For(for_init, condition, step, body, _) => {
-            let label_loop = Some(gen_label("for".to_string()));
+            let label_loop = Some(gen_named_label("for".to_string()));
             let body =
                 resolve_loop_statement(*body, hash_map, label_loop.clone(), None, collected_cases)?;
             Ok(Statement::For(
@@ -126,7 +119,7 @@ fn resolve_loop_statement(
             Ok(Statement::Continue(current_loop))
         }
         Statement::Case(expression, statement, _) => {
-            let n_label = gen_label("case".to_string());
+            let n_label = gen_named_label("case".to_string());
             let Some(unwrapped_cases) = collected_cases.as_mut() else {
                 bail!("Case not inside a switch statement");
             };
@@ -157,7 +150,7 @@ fn resolve_loop_statement(
             }
         }
         Statement::Switch(expression, statement, _, _) => {
-            let n_label = Some(gen_label("switch".to_string()));
+            let n_label = Some(gen_named_label("switch".to_string()));
             let mut new_cases: Option<Vec<(Option<Const>, String)>> = Some(Vec::new());
             Ok(Statement::Switch(
                 expression,
@@ -173,7 +166,7 @@ fn resolve_loop_statement(
             ))
         }
         Statement::Default(statement, _) => {
-            let n_label = gen_label("default".to_string());
+            let n_label = gen_named_label("default".to_string());
             let Some(unwrapped_cases) = collected_cases.as_mut() else {
                 bail!("Default not inside a switch statement");
             };
@@ -255,11 +248,7 @@ fn resolve_loop_declaration(
     }
 }
 
-static COUNTER: AtomicUsize = AtomicUsize::new(0);
-
 pub fn loop_resolution(ast: Ast) -> Result<Ast> {
-    COUNTER.store(0, Ordering::SeqCst);
-
     match ast {
         Ast::Program(functions) => {
             let mut funcs = Vec::new();
